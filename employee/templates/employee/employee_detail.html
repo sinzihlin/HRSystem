@@ -1,0 +1,338 @@
+{% extends 'employee/base.html' %}
+
+{% block content %}
+<div class="container">
+    <h1>{{ employee.name }} 的詳細資料</h1>
+    
+    <div class="page-layout">
+        <!-- 左側側邊欄 - 員工列表 -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h3>員工列表</h3>
+            </div>
+            <div class="search-box">
+                <input type="text" id="employeeSearch" placeholder="搜尋員工..." onkeyup="filterEmployees()">
+            </div>
+            <ul class="sidebar-menu" id="employeeList">
+                {% for emp in all_employees %}
+                <li {% if emp.id == employee.id %}class="active"{% endif %}>
+                    <a href="{% url 'employee_detail' emp.id %}">{{ emp.name }}</a>
+                </li>
+                {% endfor %}
+                <li class="sidebar-divider"></li>
+                <li><a href="{% url 'employee_list' %}">返回員工列表</a></li>
+            </ul>
+        </div>
+
+        <!-- 右側內容區 -->
+        <div class="content-area">
+            <div id="basic-info" class="employee-info section">
+                <h2>基本資料</h2>
+                <table class="info-table">
+                    <tr>
+                        <th>姓名:</th>
+                        <td>{{ employee.name }}</td>
+                    </tr>
+                    <tr>
+                        <th>電子郵件:</th>
+                        <td>{{ employee.email }}</td>
+                    </tr>
+                    <tr>
+                        <th>電話:</th>
+                        <td>{{ employee.phone }}</td>
+                    </tr>
+                    <tr>
+                        <th>部門:</th>
+                        <td>{{ employee.department.name }}</td>
+                    </tr>
+                    <tr>
+                        <th>到職日期:</th>
+                        <td>{{ employee.hire_date }}</td>
+                    </tr>
+                    <tr>
+                        <th>總薪資 (最近一筆):</th>
+                        <td>
+                            {% if employee.salary_set.last %}
+                                {{ employee.salary_set.last.total_salary }}
+                            {% else %}
+                                無薪資資料
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <div id="punch-records" class="record-section section">
+                <h2>打卡記錄</h2>
+                <table class="records-table">
+                    <thead>
+                        <tr>
+                            <th>日期</th>
+                            <th>時間</th>
+                            <th>類型</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for punch in punches %}
+                        <tr>
+                            <td>{{ punch.punch_time|date:"Y-m-d" }}</td>
+                            <td>{{ punch.punch_time|time:"H:i:s" }}</td>
+                            <td>{{ punch.get_punch_type_display }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3">無打卡記錄</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="leave-records" class="record-section section">
+                <h2>請假記錄</h2>
+                <table class="records-table">
+                    <thead>
+                        <tr>
+                            <th>類型</th>
+                            <th>開始日期</th>
+                            <th>結束日期</th>
+                            <th>申請日期</th>
+                            <th>狀態</th>
+                            <th>原因</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for leave in leaves %}
+                        <tr>
+                            <td>{{ leave.get_leave_type_display }}</td>
+                            <td>{{ leave.start_date }}</td>
+                            <td>{{ leave.end_date }}</td>
+                            <td>{{ leave.applied_date }}</td>
+                            <td>{{ leave.get_status_display }}</td>
+                            <td>{{ leave.reason|default:"無" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6">無請假記錄</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div id="salary-info" class="record-section section">
+                <h2>薪資資訊</h2>
+                <table class="records-table">
+                    <thead>
+                        <tr>
+                            <th>日期</th>
+                            <th>基本薪資</th>
+                            <th>獎金</th>
+                            <th>扣除額</th>
+                            <th>總薪資</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for salary in employee.salary_set.all %}
+                        <tr>
+                            <td>{{ salary.pay_date }}</td>
+                            <td>{{ salary.base_salary }}</td>
+                            <td>{{ salary.bonus }}</td>
+                            <td>{{ salary.deductions }}</td>
+                            <td>{{ salary.total_salary }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5">無薪資記錄</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+    }
+    h1 {
+        color: #333;
+        margin-bottom: 30px;
+    }
+    h2 {
+        color: #555;
+        margin-top: 20px;
+        margin-bottom: 20px;
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 10px;
+    }
+    h3 {
+        color: #444;
+        margin-top: 10px;
+        margin-bottom: 15px;
+    }
+    
+    /* 頁面布局 */
+    .page-layout {
+        display: flex;
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+    }
+    
+    /* 側邊欄 */
+    .sidebar {
+        width: 250px;
+        background-color: #f9f9f9;
+        border-right: 1px solid #eee;
+        padding: 20px 0;
+        display: flex;
+        flex-direction: column;
+        max-height: 800px;
+    }
+    .sidebar-header {
+        padding: 0 20px 15px 20px;
+        border-bottom: 1px solid #eee;
+    }
+    .search-box {
+        padding: 10px 20px;
+        margin-bottom: 10px;
+    }
+    .search-box input {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+    .sidebar-menu {
+        list-style-type: none;
+        padding: 0;
+        margin: 0;
+        overflow-y: auto;
+        flex-grow: 1;
+    }
+    .sidebar-menu li {
+        margin: 0;
+        padding: 0;
+    }
+    .sidebar-menu li a {
+        display: block;
+        padding: 10px 20px;
+        color: #555;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .sidebar-menu li a:hover {
+        background-color: #eee;
+        color: #333;
+    }
+    .sidebar-menu li.active a {
+        background-color: #4CAF50;
+        color: white;
+        font-weight: bold;
+    }
+    .sidebar-divider {
+        height: 1px;
+        background-color: #eee;
+        margin: 10px 0;
+    }
+    
+    /* 內容區 */
+    .content-area {
+        flex: 1;
+        padding: 20px;
+    }
+    .section {
+        margin-bottom: 40px;
+    }
+    .employee-info, .record-section {
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    .info-table, .records-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .info-table th, .records-table th {
+        text-align: left;
+        padding: 12px;
+        background-color: #f2f2f2;
+        color: #555;
+        font-weight: bold;
+    }
+    .info-table td, .records-table td {
+        padding: 12px;
+        border-bottom: 1px solid #eee;
+    }
+    .info-table th {
+        width: 30%;
+    }
+    .records-table tr:nth-child(even) {
+        background-color: #f9f9f9;
+    }
+    .records-table tr:hover {
+        background-color: #f1f1f1;
+    }
+    
+    /* 響應式設計 */
+    @media (max-width: 768px) {
+        .page-layout {
+            flex-direction: column;
+        }
+        .sidebar {
+            width: 100%;
+            border-right: none;
+            border-bottom: 1px solid #eee;
+            max-height: 300px;
+        }
+    }
+</style>
+
+<script>
+    // 過濾員工列表的功能
+    function filterEmployees() {
+        // 獲取輸入的搜尋文字
+        const input = document.getElementById('employeeSearch');
+        const filter = input.value.toUpperCase();
+        const ul = document.getElementById('employeeList');
+        const li = ul.getElementsByTagName('li');
+
+        // 遍歷所有列表項，隱藏不匹配的項
+        for (let i = 0; i < li.length; i++) {
+            const a = li[i].getElementsByTagName('a')[0];
+            if (a) {
+                const txtValue = a.textContent || a.innerText;
+                if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                    li[i].style.display = '';
+                } else {
+                    // 不隱藏分隔線和返回員工列表選項
+                    if (li[i].classList.contains('sidebar-divider') || 
+                        a.getAttribute('href') === "{% url 'employee_list' %}") {
+                        li[i].style.display = '';
+                    } else {
+                        li[i].style.display = 'none';
+                    }
+                }
+            }
+        }
+    }
+
+    // 頁面加載完成後執行
+    document.addEventListener('DOMContentLoaded', function() {
+        // 設置初始焦點到搜尋框
+        document.getElementById('employeeSearch').focus();
+    });
+</script>
+{% endblock %}

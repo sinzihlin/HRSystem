@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>員工列表</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            color: #333;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            color: #555;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 1; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto; /* 15% from the top and centered */
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%; /* Could be more or less, depending on screen size */
+            max-width: 500px;
+            border-radius: 8px;
+            position: relative;
+        }
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .message-box {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        .message-box.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .message-box.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .punch-form-group, .leave-form-group {
+            margin-bottom: 15px;
+        }
+        .punch-form-group label, .leave-form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .punch-form-group input[type="date"],
+        .punch-form-group input[type="time"],
+        .leave-form-group input[type="date"],
+        .leave-form-group select,
+        .leave-form-group textarea {
+            width: calc(100% - 22px);
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .punch-form-group input[type="radio"] {
+            margin-right: 5px;
+        }
+        .punch-form-group span {
+            margin-right: 15px;
+        }
+
+        /* New Leave Approval Modal Styles */
+        #leaveApprovalModal .modal-content {
+            max-width: 800px; /* Make it wider */
+            margin-top: 5%; /* Move it a bit higher */
+        }
+        .leave-approval-list {
+            max-height: 400px; /* Scrollable area for leaves */
+            overflow-y: auto;
+            border: 1px solid #eee;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .leave-request-item {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+        .leave-request-item p {
+            margin: 5px 0;
+        }
+        .leave-request-item button {
+            padding: 8px 12px;
+            margin-right: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .leave-request-item .approve-btn {
+            background-color: #28a745;
+            color: white;
+        }
+        .leave-request-item .approve-btn:hover {
+            background-color: #218838;
+        }
+        .leave-request-item .reject-btn {
+            background-color: #dc3545;
+            color: white;
+        }
+        .leave-request-item .reject-btn:hover {
+            background-color: #c82333;
+        }
+
+        /* Red dot for notification */
+        .notification-dot {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            height: 12px;
+            width: 12px;
+            background-color: red;
+            border-radius: 50%;
+            display: none; /* Hidden by default */
+        }
+        #openLeaveApprovalModal {
+            position: relative; /* For positioning the dot */
+        }
+    </style>
+</head>
+<body>
+    <h1>員工列表</h1>
+    <p>
+        <button id="openImportModal">匯入員工資料</button>
+        <button id="openLeaveApprovalModal">審核請假 <span id="notificationDot" class="notification-dot"></span></button>
+        <button id="testButton" style="background-color: #f0ad4e; color: white;">測試連接</button>
+    </p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>姓名</th>
+                <th>電子郵件</th>
+                <th>電話</th>
+                <th>部門</th>
+                <th>到職日期</th>
+                <th>總薪資 (最近一筆)</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for employee in employees %}
+            <tr>
+                <td><a href="{% url 'employee_detail' employee.id %}">{{ employee.name }}</a></td>
+                <td>{{ employee.email }}</td>
+                <td>{{ employee.phone }}</td>
+                <td>{{ employee.department.name }}</td>
+                <td>{{ employee.hire_date }}</td>
+                <td>
+                    {% if employee.salary_set.last %}
+                        {{ employee.salary_set.last.total_salary }}
+                    {% else %}
+                        無薪資資料
+                    {% endif %}
+                </td>
+                <td>
+                    <button class="openPunchModal" data-employee-id="{{ employee.id }}" data-employee-name="{{ employee.name }}">打卡</button>
+                    <button class="openLeaveModal" data-employee-id="{{ employee.id }}" data-employee-name="{{ employee.name }}">請假</button>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7">沒有員工資料。</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Import Modal -->
+    <div id="importModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>匯入員工資料</h2>
+            <div id="messageBox" class="message-box"></div>
+            <form id="importForm" enctype="multipart/form-data">
+                {% csrf_token %}
+                <label for="csv_file">選擇 CSV 檔案:</label>
+                <input type="file" name="csv_file" id="csv_file" accept=".csv" required>
+                <button type="submit">上傳並匯入</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Punch Modal -->
+    <div id="punchModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="closePunchModal">&times;</span>
+            <h2 id="punchModalTitle">為 [員工姓名] 打卡</h2>
+            <div id="punchMessageBox" class="message-box"></div>
+            <form id="punchForm">
+                {% csrf_token %}
+                <input type="hidden" id="punchEmployeeId" name="employee_id">
+                <div class="punch-form-group">
+                    <label>打卡類型:</label><br>
+                    <span>
+                        <input type="radio" id="punchTypeIn" name="punch_type" value="IN" checked>
+                        <label for="punchTypeIn">上班打卡</label>
+                    </span>
+                    <span>
+                        <input type="radio" id="punchTypeOut" name="punch_type" value="OUT">
+                        <label for="punchTypeOut">下班打卡</label>
+                    </span>
+                </div>
+                <div class="punch-form-group">
+                    <label for="punchDate">日期:</label>
+                    <input type="date" id="punchDate" name="punch_date" required>
+                </div>
+                <div class="punch-form-group">
+                    <label for="punchTime">時間:</label>
+                    <input type="time" id="punchTime" name="punch_time" required>
+                </div>
+                <button type="submit">確認打卡</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Leave Modal -->
+    <div id="leaveModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="closeLeaveModal">&times;</span>
+            <h2 id="leaveModalTitle">為 [員工姓名] 提交請假申請</h2>
+            <div id="leaveMessageBox" class="message-box"></div>
+            <form id="leaveForm">
+                {% csrf_token %}
+                <input type="hidden" id="leaveEmployeeId" name="employee_id">
+                <div class="leave-form-group">
+                    <label for="leaveType">請假類型:</label>
+                    <select id="leaveType" name="leave_type" required>
+                        <option value="ANNUAL">特休</option>
+                        <option value="SICK">病假</option>
+                        <option value="PERSONAL">事假</option>
+                        <option value="MARRIAGE">婚假</option>
+                        <option value="FUNERAL">喪假</option>
+                        <option value="MATERNITY">產假</option>
+                        <option value="PATERNITY">陪產假</option>
+                        <option value="PUBLIC">公假</option>
+                        <option value="COMPENSATORY">補休</option>
+                    </select>
+                </div>
+                <div class="leave-form-group">
+                    <label for="leaveStartDate">開始日期:</label>
+                    <input type="date" id="leaveStartDate" name="start_date" required>
+                </div>
+                <div class="leave-form-group">
+                    <label for="leaveEndDate">結束日期:</label>
+                    <input type="date" id="leaveEndDate" name="end_date" required>
+                </div>
+                <div class="leave-form-group">
+                    <label for="leaveReason">請假原因 (可選):</label>
+                    <textarea id="leaveReason" name="reason" rows="3"></textarea>
+                </div>
+                <button type="submit">提交請假申請</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Leave Approval Modal -->
+    <div id="leaveApprovalModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="closeLeaveApprovalModal">&times;</span>
+            <h2>待審核請假申請</h2>
+            <div id="leaveApprovalMessageBox" class="message-box"></div>
+            <div class="leave-approval-list" id="pendingLeavesList">
+                <!-- Pending leave requests will be loaded here -->
+                <p>載入中...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 除錯功能
+        const DEBUG = true;
+        function logDebug(message, data) {
+            if (DEBUG) {
+                console.log(`[DEBUG] ${message}`, data || '');
+            }
+        }
+
+        // CSRF Token Helper
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    // Does this cookie string begin with the name we want?
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        const csrfToken = getCookie('csrftoken');
+        logDebug('CSRF Token:', csrfToken);
+
+        // Import Modal Logic
+        var importModal = document.getElementById("importModal");
+        var openImportBtn = document.getElementById("openImportModal");
+        var closeImportSpan = importModal.getElementsByClassName("close-button")[0];
+        var importMessageBox = document.getElementById("messageBox");
+
+        openImportBtn.onclick = function() {
+            importModal.style.display = "block";
+            importMessageBox.style.display = "none";
+        }
+
+        closeImportSpan.onclick = function() {
+            importModal.style.display = "none";
+        }
+
+        // Punch Modal Logic
+        var punchModal = document.getElementById("punchModal");
+        var closePunchSpan = document.getElementById("closePunchModal");
+        var punchMessageBox = document.getElementById("punchMessageBox");
+        var punchEmployeeIdInput = document.getElementById("punchEmployeeId");
+        var punchModalTitle = document.getElementById("punchModalTitle");
+        var punchDateInput = document.getElementById("punchDate");
+        var punchTimeInput = document.getElementById("punchTime");
+
+        document.querySelectorAll('.openPunchModal').forEach(button => {
+            button.onclick = function() {
+                var employeeId = this.dataset.employeeId;
+                var employeeName = this.dataset.employeeName;
+                punchEmployeeIdInput.value = employeeId;
+                punchModalTitle.innerText = `為 ${employeeName} 打卡`;
+                
+                // Set current date and time as default
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = (now.getMonth() + 1).toString().padStart(2, '0');
+                const day = now.getDate().toString().padStart(2, '0');
+                const hours = now.getHours().toString().padStart(2, '0');
+                const minutes = now.getMinutes().toString().padStart(2, '0');
+
+                punchDateInput.value = `${year}-${month}-${day}`;
+                punchTimeInput.value = `${hours}:${minutes}`;
+
+                punchMessageBox.style.display = "none";
+                punchModal.style.display = "block";
+            };
+        });
+
+        closePunchSpan.onclick = function() {
+            punchModal.style.display = "none";
+        }
+
+        // Leave Modal Logic
+        var leaveModal = document.getElementById("leaveModal");
+        var closeLeaveSpan = document.getElementById("closeLeaveModal");
+        var leaveMessageBox = document.getElementById("leaveMessageBox");
+        var leaveEmployeeIdInput = document.getElementById("leaveEmployeeId");
+        var leaveModalTitle = document.getElementById("leaveModalTitle");
+        var leaveStartDateInput = document.getElementById("leaveStartDate");
+        var leaveEndDateInput = document.getElementById("leaveEndDate");
+
+        document.querySelectorAll('.openLeaveModal').forEach(button => {
+            button.onclick = function() {
+                var employeeId = this.dataset.employeeId;
+                var employeeName = this.dataset.employeeName;
+                leaveEmployeeIdInput.value = employeeId;
+                leaveModalTitle.innerText = `為 ${employeeName} 提交請假申請`;
+
+                // Set current date as default
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = (now.getMonth() + 1).toString().padStart(2, '0');
+                const day = now.getDate().toString().padStart(2, '0');
+                const today = `${year}-${month}-${day}`;
+                leaveStartDateInput.value = today;
+                leaveEndDateInput.value = today;
+
+                leaveMessageBox.style.display = "none";
+                leaveModal.style.display = "block";
+            };
+        });
+
+        closeLeaveSpan.onclick = function() {
+            leaveModal.style.display = "none";
+        }
+
+        window.onclick = function(event) {
+            if (event.target == importModal) {
+                importModal.style.display = "none";
+            } else if (event.target == punchModal) {
+                punchModal.style.display = "none";
+            } else if (event.target == leaveModal) {
+                leaveModal.style.display = "none";
+            } else if (event.target == leaveApprovalModal) { // Close approval modal if clicked outside
+                leaveApprovalModal.style.display = "none";
+            }
+        }
+
+        // Handle Import Form Submission via AJAX
+        document.getElementById('importForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            logDebug('提交匯入表單');
+
+            var formData = new FormData(this);
+
+            fetch('{% url "import_employees_api" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': csrfToken
+                },
+                credentials: 'same-origin'
+            })
+            .then(response => {
+                logDebug('匯入回應狀態:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                logDebug('匯入回應數據:', data);
+                importMessageBox.style.display = "block";
+                if (data.status === 'success') {
+                    importMessageBox.className = 'message-box success';
+                    importMessageBox.innerHTML = data.message;
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    importMessageBox.className = 'message-box error';
+                    importMessageBox.innerHTML = data.message + (data.errors ? '<br>' + data.errors.join('<br>') : '');
+                }
+            })
+            .catch(error => {
+                logDebug('匯入錯誤:', error);
+                importMessageBox.style.display = "block";
+                importMessageBox.className = 'message-box error';
+                importMessageBox.innerHTML = '匯入失敗: ' + error;
+            });
+        });
+
+        // Handle Punch Form Submission via AJAX
+        document.getElementById('punchForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            var employeeId = document.getElementById('punchEmployeeId').value;
+            var punchType = document.querySelector('input[name="punch_type"]:checked').value;
+            var punchDate = document.getElementById('punchDate').value;
+            var punchTime = document.getElementById('punchTime').value;
+            var punchDateTime = `${punchDate} ${punchTime}:00`; // Add seconds for consistency
+
+            fetch('{% url "punch_api" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    'employee_id': employeeId,
+                    'punch_type': punchType,
+                    'punch_time': punchDateTime
+                })
+            })
+            .then(response => {
+                logDebug('打卡回應狀態:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                logDebug('打卡回應數據:', data);
+                punchMessageBox.style.display = "block";
+                if (data.status === 'success') {
+                    punchMessageBox.className = 'message-box success';
+                    punchMessageBox.innerHTML = data.message;
+                    setTimeout(() => {
+                        punchModal.style.display = "none";
+                        // Optionally, reload the page or update a punch history section
+                    }, 1500);
+                } else {
+                    punchMessageBox.className = 'message-box error';
+                    punchMessageBox.innerHTML = data.message;
+                }
+            })
+            .catch(error => {
+                logDebug('打卡錯誤:', error);
+                punchMessageBox.style.display = "block";
+                punchMessageBox.className = 'message-box error';
+                punchMessageBox.innerHTML = '打卡失敗: ' + error;
+            });
+        });
+
+        // Handle Leave Form Submission via AJAX
+        document.getElementById('leaveForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            logDebug('提交請假表單');
+
+            var employeeId = document.getElementById('leaveEmployeeId').value;
+            var leaveType = document.getElementById('leaveType').value;
+            var startDate = document.getElementById('leaveStartDate').value;
+            var endDate = document.getElementById('leaveEndDate').value;
+            var reason = document.getElementById('leaveReason').value;
+            
+            const leaveData = {
+                'employee_id': employeeId,
+                'leave_type': leaveType,
+                'start_date': startDate,
+                'end_date': endDate,
+                'reason': reason
+            };
+            logDebug('請假數據:', leaveData);
+
+            fetch('{% url "leave_api" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify(leaveData)
+            })
+            .then(response => {
+                logDebug('請假回應狀態:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                logDebug('請假回應數據:', data);
+                leaveMessageBox.style.display = "block";
+                if (data.status === 'success') {
+                    leaveMessageBox.className = 'message-box success';
+                    leaveMessageBox.innerHTML = data.message;
+                    setTimeout(() => {
+                        leaveModal.style.display = "none";
+                        // No need to fetchPendingLeaves here, as it's for the approval modal
+                    }, 1500);
+                } else {
+                    leaveMessageBox.className = 'message-box error';
+                    leaveMessageBox.innerHTML = data.message;
+                }
+            })
+            .catch(error => {
+                logDebug('請假錯誤:', error);
+                leaveMessageBox.style.display = "block";
+                leaveMessageBox.className = 'message-box error';
+                leaveMessageBox.innerHTML = '提交請假失敗: ' + error;
+            });
+        });
+
+        // Leave Approval Modal Logic
+        var leaveApprovalModal = document.getElementById("leaveApprovalModal");
+        var openLeaveApprovalBtn = document.getElementById("openLeaveApprovalModal");
+        var closeLeaveApprovalSpan = document.getElementById("closeLeaveApprovalModal");
+        var leaveApprovalMessageBox = document.getElementById("leaveApprovalMessageBox");
+        var pendingLeavesList = document.getElementById("pendingLeavesList");
+        var notificationDot = document.getElementById("notificationDot");
+
+        openLeaveApprovalBtn.onclick = function() {
+            leaveApprovalModal.style.display = "block";
+            leaveApprovalMessageBox.style.display = "none";
+            fetchPendingLeaves();
+        }
+
+        closeLeaveApprovalSpan.onclick = function() {
+            leaveApprovalModal.style.display = "none";
+        }
+
+        async function fetchPendingLeaves() {
+            pendingLeavesList.innerHTML = '<p>載入中...</p>';
+            logDebug('獲取待審核請假申請');
+            try {
+                const response = await fetch('{% url "get_pending_leaves_api" %}', {
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-CSRFToken': csrfToken
+                    }
+                });
+                logDebug('待審核請假回應狀態:', response.status);
+                const data = await response.json();
+                logDebug('待審核請假回應數據:', data);
+
+                if (data.status === 'success') {
+                    renderPendingLeaves(data.leaves);
+                    // Update notification dot
+                    if (data.leaves.length > 0) {
+                        notificationDot.style.display = "block";
+                    } else {
+                        notificationDot.style.display = "none";
+                    }
+                } else {
+                    pendingLeavesList.innerHTML = '<p class="error">載入請假申請失敗: ' + data.message + '</p>';
+                    notificationDot.style.display = "none";
+                }
+            } catch (error) {
+                pendingLeavesList.innerHTML = '<p class="error">載入請假申請失敗: ' + error + '</p>';
+                notificationDot.style.display = "none";
+            }
+        }
+
+        function renderPendingLeaves(leaves) {
+            pendingLeavesList.innerHTML = '';
+            if (leaves.length === 0) {
+                pendingLeavesList.innerHTML = '<p>目前沒有待審核的請假申請。</p>';
+                return;
+            }
+
+            leaves.forEach(leave => {
+                const leaveItem = document.createElement('div');
+                leaveItem.className = 'leave-request-item';
+                leaveItem.innerHTML = `
+                    <p><strong>員工:</strong> ${leave.employee_name}</p>
+                    <p><strong>類型:</strong> ${leave.leave_type}</p>
+                    <p><strong>日期:</strong> ${leave.start_date} 至 ${leave.end_date}</p>
+                    <p><strong>原因:</strong> ${leave.reason || '無'}</p>
+                    <p><strong>申請日期:</strong> ${leave.applied_date}</p>
+                    <button class="approve-btn" data-leave-id="${leave.id}">批准</button>
+                    <button class="reject-btn" data-leave-id="${leave.id}">拒絕</button>
+                `;
+                pendingLeavesList.appendChild(leaveItem);
+            });
+
+            document.querySelectorAll('.approve-btn').forEach(button => {
+                button.onclick = function() {
+                    updateLeaveStatus(this.dataset.leaveId, 'APPROVED');
+                };
+            });
+
+            document.querySelectorAll('.reject-btn').forEach(button => {
+                button.onclick = function() {
+                    updateLeaveStatus(this.dataset.leaveId, 'REJECTED');
+                };
+            });
+        }
+
+        async function updateLeaveStatus(leaveId, status) {
+            logDebug('更新請假狀態:', { leaveId, status });
+            try {
+                const response = await fetch('{% url "update_leave_status_api" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        'leave_id': leaveId,
+                        'status': status
+                    })
+                });
+                logDebug('更新請假狀態回應狀態:', response.status);
+                const data = await response.json();
+                logDebug('更新請假狀態回應數據:', data);
+
+                if (data.status === 'success') {
+                    leaveApprovalMessageBox.className = 'message-box success';
+                    leaveApprovalMessageBox.innerHTML = data.message;
+                    leaveApprovalMessageBox.style.display = "block";
+                    fetchPendingLeaves(); // Refresh the list and update dot
+                } else {
+                    leaveApprovalMessageBox.className = 'message-box error';
+                    leaveApprovalMessageBox.innerHTML = '操作失敗: ' + data.message;
+                    leaveApprovalMessageBox.style.display = "block";
+                }
+            } catch (error) {
+                logDebug('更新請假狀態錯誤:', error);
+                leaveApprovalMessageBox.className = 'message-box error';
+                leaveApprovalMessageBox.innerHTML = '操作失敗: ' + error;
+                leaveApprovalMessageBox.style.display = "block";
+            }
+        }
+
+        // Initial fetch when page loads
+        document.addEventListener('DOMContentLoaded', fetchPendingLeaves);
+        
+        // 測試按鈕處理
+        document.getElementById('testButton').addEventListener('click', function() {
+            logDebug('測試按鈕被點擊');
+            const testMessageBox = document.createElement('div');
+            testMessageBox.className = 'message-box success';
+            testMessageBox.style.display = 'block';
+            testMessageBox.style.position = 'fixed';
+            testMessageBox.style.top = '10px';
+            testMessageBox.style.right = '10px';
+            testMessageBox.style.zIndex = '9999';
+            testMessageBox.innerHTML = '測試按鈕點擊成功！時間：' + new Date().toLocaleTimeString();
+            document.body.appendChild(testMessageBox);
+            
+            // 5秒後自動移除消息
+            setTimeout(() => {
+                document.body.removeChild(testMessageBox);
+            }, 5000);
+            
+            // 測試簡單的 API 請求
+            fetch('{% url "get_pending_leaves_api" %}', {
+                credentials: 'same-origin',
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            })
+            .then(response => {
+                logDebug('測試 API 回應狀態:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                logDebug('測試 API 回應數據:', data);
+                alert('API 測試成功！請檢查控制台以查看詳細信息。');
+            })
+            .catch(error => {
+                logDebug('測試 API 錯誤:', error);
+                alert('API 測試失敗：' + error);
+            });
+        });
+    </script>
+</body>
+</html>
