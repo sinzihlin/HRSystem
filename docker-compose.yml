@@ -1,0 +1,28 @@
+version: '3'
+
+services:
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=1
+      - DJANGO_SECRET_KEY=django-insecure-w79s+@xn+d=b0gm80b(ld_0qg2348j_t(_u!x6^b0%jc&1c2k^
+      - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]
+    depends_on:
+      - db
+  
+  db:
+    image: postgres:14
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_DB=hrsystem
+      - POSTGRES_USER=hrsystem
+      - POSTGRES_PASSWORD=hrsystem123
+
+volumes:
+  postgres_data:
