@@ -103,6 +103,17 @@ class Salary(models.Model):
         return f"{self.employee.name} - {self.period}"
 
     @property
+    def formatted_overtime(self):
+        """將加班時數格式化為 X 小 Y 分鐘"""
+        if self.overtime_hours is None:
+            return "0 小 0 分"
+        
+        hours = int(self.overtime_hours)
+        minutes = int((self.overtime_hours - hours) * 60)
+        
+        return f"{hours} 小 {minutes} 分"
+
+    @property
     def total_salary(self):
         salary_items = self.salarydetail_set.all()
         total = self.base_amount + self.overtime_amount
@@ -112,6 +123,18 @@ class Salary(models.Model):
             else:
                 total -= item.amount
         return total
+
+    @property
+    def base_amount_int(self):
+        return int(round(self.base_amount, 0))
+
+    @property
+    def overtime_amount_int(self):
+        return int(round(self.overtime_amount, 0))
+
+    @property
+    def total_salary_int(self):
+        return int(round(self.total_salary, 0))
     
     class Meta:
         verbose_name = '薪資紀錄'

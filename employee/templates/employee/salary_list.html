@@ -1,4 +1,5 @@
 {% extends "employee/base.html" %}
+{% load humanize %}
 
 {% block content %}
 <div class="container">
@@ -95,23 +96,7 @@
                 </form>
             </div>
 
-            <!-- 統計資訊區域 -->
-            <div class="statistics-section">
-                <div class="stats-card">
-                    <div class="stat-item">
-                        <div class="stat-value" id="totalRecords">{{ total_records }}</div>
-                        <div class="stat-label">薪資記錄</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value" id="totalAmount">NT$ {{ total_amount|floatformat:0 }}</div>
-                        <div class="stat-label">總薪資</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value" id="averageAmount">NT$ {{ average_amount|floatformat:0 }}</div>
-                        <div class="stat-label">平均薪資</div>
-                    </div>
-                </div>
-            </div>
+            
 
             <!-- 載入指示器 -->
             <div id="loadingIndicator" class="loading-indicator" style="display: none;">
@@ -151,11 +136,11 @@
                                         <small class="text-muted">發薪日：{{ salary.period.pay_date|date:"Y-m-d" }}</small>
                                     </div>
                                 </td>
-                                <td class="text-right">NT$ {{ salary.base_amount|floatformat:0 }}</td>
-                                <td class="text-center">{{ salary.overtime_hours|floatformat:1 }} 小時</td>
-                                <td class="text-right">NT$ {{ salary.overtime_amount|floatformat:0 }}</td>
+                                <td class="text-right">{{ salary.base_amount_int|intcomma }}</td>
+                                <td class="text-center">{{ salary.formatted_overtime }}</td>
+                                <td class="text-right">{{ salary.overtime_amount_int|intcomma }}</td>
                                 <td class="text-right">
-                                    <strong>NT$ {{ salary.total_salary|floatformat:0 }}</strong>
+                                    <strong>{{ salary.total_salary_int|intcomma }}</strong>
                                 </td>
                                 <td>
                                     {% if salary.is_confirmed %}

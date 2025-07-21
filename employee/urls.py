@@ -4,9 +4,7 @@ from . import views
 from . import salary_views
 
 urlpatterns = [
-    path('', RedirectView.as_view(url='employees/', permanent=False), name='index'),
-    path('employees/', views.EmployeeListView.as_view(), name='employee_list'),
-    path('employees/<int:pk>/', views.EmployeeDetailView.as_view(), name='employee_detail'),
+    path('', RedirectView.as_view(url='salary/', permanent=False), name='index'),
     
     # 認證相關
     path('login/', views.CustomLoginView.as_view(), name='login'),

@@ -37,66 +37,7 @@ class CustomLoginView(LoginView):
 class CustomLogoutView(LogoutView):
     template_name = 'employee/logged_out.html'
 
-class EmployeeListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
-    model = Employee
-    template_name = 'employee/employee_list.html'
-    context_object_name = 'employees'
 
-    def test_func(self):
-        return self.request.user.is_staff
-
-    def dispatch(self, request, *args, **kwargs):
-        # 檢查資料庫連線
-        if not check_database_connection():
-            logger.error("資料庫連線失敗，轉向錯誤頁面")
-            return render(request, 'employee/database_error.html', {
-                'error_message': '資料庫暫時無法連線，請稍後再試或聯絡系統管理員。'
-            })
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_queryset(self):
-        try:
-            return Employee.objects.all()
-        except (DatabaseError, OperationalError) as e:
-            logger.error(f"查詢員工資料時發生錯誤: {e}")
-            return Employee.objects.none()
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        
-        try:
-            # 檢查是否有員工資料
-            employee_count = Employee.objects.count()
-            context['employee_count'] = employee_count
-            context['has_employees'] = employee_count > 0
-            
-            # 如果沒有員工資料，提供友善的提示
-            if employee_count == 0:
-                context['no_data_message'] = '系統中還沒有員工資料，您可以使用「匯入員工資料」功能來新增員工。'
-            
-        except (DatabaseError, OperationalError) as e:
-            logger.error(f"取得員工統計資料時發生錯誤: {e}")
-            context['database_error'] = True
-            context['error_message'] = '載入資料時發生錯誤，請重新整理頁面或聯絡系統管理員。'
-        
-        return context
-
-class EmployeeDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
-    model = Employee
-    template_name = 'employee/employee_detail.html'
-    context_object_name = 'employee'
-
-    def test_func(self):
-        return self.request.user.is_staff
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        employee = self.get_object()
-        context['leaves'] = employee.leave_set.all().order_by('-applied_date')
-        context['punches'] = employee.punch_set.all().order_by('-punch_time')
-        # 添加所有員工列表
-        context['all_employees'] = Employee.objects.all().order_by('name')
-        return context
 
 @require_POST
 def import_employees_api(request):
