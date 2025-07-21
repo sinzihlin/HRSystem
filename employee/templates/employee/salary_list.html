@@ -153,7 +153,7 @@
                                 <td>
                                     <div class="action-buttons">
                                         <a href="{% url 'salary_detail' salary.id %}" class="btn btn-sm btn-info">詳細</a>
-                                        <button class="btn btn-sm btn-primary add-punch-record-btn" data-employee-id="{{ salary.employee.id }}">新增打卡</button>
+                                        <a href="{% url 'employee_punches' salary.employee.id %}" class="btn btn-sm btn-primary">打卡</a>
                                     </div>
                                 </td>
                             </tr>
@@ -232,45 +232,6 @@
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">創建期間</button>
                 <button type="button" class="btn btn-secondary" onclick="closeModal('createPeriodModal')">取消</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- 新增打卡紀錄模態框 -->
-<div id="addPunchRecordModal" class="modal">
-    <div class="modal-content">
-        <span class="close">&times;</span>
-        <h2>新增打卡紀錄</h2>
-        <form id="addPunchRecordForm">
-            <div class="form-group">
-                <label for="punchEmployeeSelect">員工：</label>
-                <select id="punchEmployeeSelect" name="employee_id" class="form-control" required>
-                    <option value="">請選擇員工</option>
-                    {% for emp in employees %}
-                        <option value="{{ emp.id }}">{{ emp.name }} ({{ emp.department.name }})</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="punchTypeSelect">打卡類型：</label>
-                <select id="punchTypeSelect" name="punch_type" class="form-control" required>
-                    <option value="">請選擇打卡類型</option>
-                    <option value="IN">上班打卡</option>
-                    <option value="OUT">下班打卡</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="punchDate">日期：</label>
-                <input type="date" id="punchDate" name="punch_date" class="form-control" required>
-            </div>
-            <div class="form-group">
-                <label for="punchTime">時間：</label>
-                <input type="time" id="punchTime" name="punch_time" class="form-control" step="1" required>
-            </div>
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">新增紀錄</button>
-                <button type="button" class="btn btn-secondary" onclick="closeModal('addPunchRecordModal')">取消</button>
             </div>
         </form>
     </div>
@@ -890,30 +851,6 @@ document.addEventListener('DOMContentLoaded', function() {
         currentEmployeeId = parseInt(selectedEmployeeId);
         updateSidebarSelection(currentEmployeeId);
     }
-
-    // 監聽表格中的「新增打卡」按鈕
-    document.addEventListener('click', function(event) {
-        if (event.target.classList.contains('add-punch-record-btn')) {
-            const employeeId = event.target.dataset.employeeId;
-            openModal('addPunchRecordModal');
-            
-            // 預選員工
-            const punchEmployeeSelect = document.getElementById('punchEmployeeSelect');
-            if (punchEmployeeSelect) {
-                punchEmployeeSelect.value = employeeId;
-            }
-
-            // 設定預設日期為今天
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('punchDate').value = today;
-            // 設定預設時間為當前時間
-            const now = new Date();
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            document.getElementById('punchTime').value = `${hours}:${minutes}:${seconds}`;
-        }
-    });
 });
 
 function initializePage() {
@@ -957,11 +894,6 @@ function setupModals() {
     const createPeriodForm = document.getElementById('createPeriodForm');
     if (createPeriodForm) {
         createPeriodForm.onsubmit = handleCreatePeriod;
-    }
-
-    const addPunchRecordForm = document.getElementById('addPunchRecordForm');
-    if (addPunchRecordForm) {
-        addPunchRecordForm.onsubmit = handleAddPunchRecord;
     }
 }
 
@@ -1191,49 +1123,6 @@ function handleCreatePeriod(event) {
     .catch(error => {
         console.error('Error:', error);
         alert('創建時發生錯誤，請稍後再試');
-    });
-}
-
-// 新增打卡紀錄
-function handleAddPunchRecord(event) {
-    event.preventDefault();
-
-    const formData = new FormData(event.target);
-    const employeeId = formData.get('employee_id');
-    const punchType = formData.get('punch_type');
-    const punchDate = formData.get('punch_date');
-    const punchTime = formData.get('punch_time');
-
-    // 組合日期和時間
-    const punchTimeStr = `${punchDate} ${punchTime}`;
-
-    const data = {
-        employee_id: employeeId,
-        punch_type: punchType,
-        punch_time: punchTimeStr
-    };
-
-    fetch('/api/punch/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success') {
-            alert('打卡紀錄新增成功！');
-            closeModal('addPunchRecordModal');
-            location.reload();
-        } else {
-            alert('新增失敗：' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('新增時發生錯誤，請稍後再試');
     });
 }
 

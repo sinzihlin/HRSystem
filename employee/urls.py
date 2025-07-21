@@ -23,6 +23,7 @@ urlpatterns = [
     path('api/leave/', views.leave_api, name='leave_api'),
     path('api/leaves/pending/', views.get_pending_leaves_api, name='get_pending_leaves_api'),
     path('api/leaves/update_status/', views.update_leave_status_api, name='update_leave_status_api'),
+    path('employees/<int:employee_id>/punches/', views.employee_punches_view, name='employee_punches'),
     
     # 薪資相關 API
     path('api/payroll/periods/create/', salary_views.create_payroll_period, name='create_payroll_period'),

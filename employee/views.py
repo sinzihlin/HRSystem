@@ -246,6 +246,14 @@ def update_leave_status_api(request):
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': f'更新請假狀態失敗: {e}'})
 
+
+from django.shortcuts import get_object_or_404
+
+def employee_punches_view(request, employee_id):
+    employee = get_object_or_404(Employee, pk=employee_id)
+    punches = Punch.objects.filter(employee=employee).order_by('-punch_time')
+    return render(request, 'employee/employee_punches.html', {'employee': employee, 'punches': punches})
+
 @require_GET
 def health_check(request):
     """系統健康檢查端點"""
