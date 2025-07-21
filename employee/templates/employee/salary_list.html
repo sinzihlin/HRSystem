@@ -7,7 +7,7 @@
         <h1>薪資管理系統</h1>
         <div class="header-actions">
             <button id="createPeriodBtn" class="btn btn-primary">創建薪資期間</button>
-            <button id="addPunchRecordBtn" class="btn btn-info">新增打卡紀錄</button>
+            
             <button id="payrollManagementBtn" class="btn btn-secondary">薪資期間管理</button>
         </div>
     </div>
@@ -153,6 +153,7 @@
                                 <td>
                                     <div class="action-buttons">
                                         <a href="{% url 'salary_detail' salary.id %}" class="btn btn-sm btn-info">詳細</a>
+                                        <button class="btn btn-sm btn-primary add-punch-record-btn" data-employee-id="{{ salary.employee.id }}">新增打卡</button>
                                     </div>
                                 </td>
                             </tr>
@@ -889,6 +890,30 @@ document.addEventListener('DOMContentLoaded', function() {
         currentEmployeeId = parseInt(selectedEmployeeId);
         updateSidebarSelection(currentEmployeeId);
     }
+
+    // 監聽表格中的「新增打卡」按鈕
+    document.addEventListener('click', function(event) {
+        if (event.target.classList.contains('add-punch-record-btn')) {
+            const employeeId = event.target.dataset.employeeId;
+            openModal('addPunchRecordModal');
+            
+            // 預選員工
+            const punchEmployeeSelect = document.getElementById('punchEmployeeSelect');
+            if (punchEmployeeSelect) {
+                punchEmployeeSelect.value = employeeId;
+            }
+
+            // 設定預設日期為今天
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('punchDate').value = today;
+            // 設定預設時間為當前時間
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('punchTime').value = `${hours}:${minutes}:${seconds}`;
+        }
+    });
 });
 
 function initializePage() {
@@ -905,7 +930,6 @@ function initializePage() {
 function setupModals() {
     const createPeriodBtn = document.getElementById('createPeriodBtn');
     const createFirstPeriodBtn = document.getElementById('createFirstPeriodBtn');
-    const addPunchRecordBtn = document.getElementById('addPunchRecordBtn');
     
     if (createPeriodBtn) {
         createPeriodBtn.onclick = () => openModal('createPeriodModal');
@@ -913,21 +937,6 @@ function setupModals() {
     
     if (createFirstPeriodBtn) {
         createFirstPeriodBtn.onclick = () => openModal('createPeriodModal');
-    }
-
-    if (addPunchRecordBtn) {
-        addPunchRecordBtn.onclick = () => {
-            openModal('addPunchRecordModal');
-            // 設定預設日期為今天
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('punchDate').value = today;
-            // 設定預設時間為當前時間
-            const now = new Date();
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            document.getElementById('punchTime').value = `${hours}:${minutes}:${seconds}`;
-        };
     }
     
     // 關閉按鈕
