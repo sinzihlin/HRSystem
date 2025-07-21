@@ -252,7 +252,8 @@ from django.shortcuts import get_object_or_404
 def employee_punches_view(request, employee_id):
     employee = get_object_or_404(Employee, pk=employee_id)
     punches = Punch.objects.filter(employee=employee).order_by('-punch_time')
-    return render(request, 'employee/employee_punches.html', {'employee': employee, 'punches': punches})
+    employees = Employee.objects.all().order_by('name') # 獲取所有員工
+    return render(request, 'employee/employee_punches.html', {'employee': employee, 'punches': punches, 'employees': employees})
 
 @require_GET
 def health_check(request):
