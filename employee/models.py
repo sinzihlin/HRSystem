@@ -6,6 +6,10 @@ class Department(models.Model):
     def __str__(self):
         return self.name
 
+    class Meta:
+        verbose_name = '部門'
+        verbose_name_plural = '部門'
+
 class Employee(models.Model):
     EMPLOYMENT_TYPE_CHOICES = [
         ('FT', '正職'),
@@ -182,6 +186,10 @@ class Punch(models.Model):
     def __str__(self):
         return f"{self.employee.name} - {self.get_punch_type_display()} at {self.punch_time.strftime('%Y-%m-%d %H:%M:%S')}"
 
+    class Meta:
+        verbose_name = '打卡記錄'
+        verbose_name_plural = '打卡記錄'
+
 class WorkSchedule(models.Model):
     SCHEDULE_TYPE_CHOICES = [
         ('REGULAR', '固定班'),
@@ -221,6 +229,19 @@ class WorkSchedule(models.Model):
         verbose_name = '工作班別'
         verbose_name_plural = '工作班別'
 
+def get_default_work_schedule():
+    from .models import WorkSchedule
+    schedule, created = WorkSchedule.objects.get_or_create(
+        name='標準日班',
+        defaults={
+            'schedule_type': 'REGULAR',
+            'start_time': '09:00:00',
+            'end_time': '18:00:00',
+            'description': '預設標準日班'
+        }
+    )
+    return schedule
+
 class EmployeeSchedule(models.Model):
     employee = models.ForeignKey(
         Employee,
@@ -230,7 +251,8 @@ class EmployeeSchedule(models.Model):
     work_schedule = models.ForeignKey(
         WorkSchedule,
         on_delete=models.CASCADE,
-        verbose_name='班別'
+        verbose_name='班別',
+        default=get_default_work_schedule
     )
     start_date = models.DateField(verbose_name='生效日期')
     end_date = models.DateField(
@@ -322,3 +344,7 @@ class Leave(models.Model):
 
     def __str__(self):
         return f"{self.employee.name} - {self.get_leave_type_display()} ({self.start_date} to {self.end_date}) - {self.get_status_display()}"
+
+    class Meta:
+        verbose_name = '請假記錄'
+        verbose_name_plural = '請假記錄'

@@ -65,6 +65,8 @@ class WorkScheduleAdmin(admin.ModelAdmin):
     list_filter = ('schedule_type', 'is_night_shift')
     search_fields = ('name', 'description')
 
+
+
 @admin.register(EmployeeSchedule)
 class EmployeeScheduleAdmin(admin.ModelAdmin):
     list_display = ('employee', 'work_schedule', 'start_date', 'end_date', 'is_primary')

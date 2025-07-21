@@ -34,6 +34,16 @@ class CustomLoginView(LoginView):
     fields = '__all__'
     redirect_authenticated_user = True
 
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        try:
+            employee = Employee.objects.get(email=self.request.user.email)
+            self.request.session['employee_id'] = employee.id
+        except Employee.DoesNotExist:
+            self.request.session['employee_id'] = None
+            messages.warning(self.request, "您的用戶帳號未綁定員工資料，部分功能可能受限。")
+        return response
+
 class CustomLogoutView(LogoutView):
     template_name = 'employee/logged_out.html'
 
@@ -252,8 +262,9 @@ from django.shortcuts import get_object_or_404
 def employee_punches_view(request, employee_id):
     employee = get_object_or_404(Employee, pk=employee_id)
     punches = Punch.objects.filter(employee=employee).order_by('-punch_time')
+    leaves = Leave.objects.filter(employee=employee).order_by('-applied_date')
     employees = Employee.objects.all().order_by('name') # 獲取所有員工
-    return render(request, 'employee/employee_punches.html', {'employee': employee, 'punches': punches, 'employees': employees})
+    return render(request, 'employee/employee_punches.html', {'employee': employee, 'punches': punches, 'leaves': leaves, 'employees': employees})
 
 @require_GET
 def health_check(request):

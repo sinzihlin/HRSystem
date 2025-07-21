@@ -4,7 +4,7 @@
 {% block content %}
 <div class="container">
     <div class="page-header">
-        <h1>{{ employee.name }} 的打卡紀錄</h1>
+        <h1>{{ employee.name }} 的個人資訊與打卡紀錄</h1>
         <div class="header-actions">
             <a href="{% url 'salary_list' %}" class="btn btn-secondary">返回薪資列表</a>
         </div>
@@ -38,6 +38,24 @@
         <!-- 右側內容區 -->
         <div class="content-area">
             <div class="filter-section">
+                <h3>員工基本資訊</h3>
+                <div class="employee-details-grid">
+                    <div class="detail-item"><strong>姓名:</strong> {{ employee.name }}</div>
+                    <div class="detail-item"><strong>電子郵件:</strong> {{ employee.email }}</div>
+                    <div class="detail-item"><strong>電話:</strong> {{ employee.phone }}</div>
+                    <div class="detail-item"><strong>部門:</strong> {{ employee.department.name }}</div>
+                    <div class="detail-item"><strong>到職日期:</strong> {{ employee.hire_date|date:"Y-m-d" }}</div>
+                    <div class="detail-item"><strong>僱用類型:</strong> {{ employee.get_employment_type_display }}</div>
+                    {% if employee.employment_type == 'PT' %}
+                        <div class="detail-item"><strong>時薪:</strong> {{ employee.hourly_rate }}</div>
+                    {% else %}
+                        <div class="detail-item"><strong>基本薪資:</strong> {{ employee.base_salary }}</div>
+                    {% endif %}
+                    <div class="detail-item"><strong>在職狀態:</strong> {% if employee.active %}在職{% else %}離職{% endif %}</div>
+                </div>
+            </div>
+
+            <div class="filter-section" style="margin-top: 20px;">
                 <h3>新增打卡紀錄</h3>
                 <form id="addPunchRecordForm" class="filter-form">
                     <input type="hidden" id="employeeId" value="{{ employee.id }}">
@@ -93,6 +111,43 @@
                     </div>
                 {% endif %}
             </div>
+                {% if leaves %}
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>請假類型</th>
+                                <th>開始日期</th>
+                                <th>結束日期</th>
+                                <th>原因</th>
+                                <th>狀態</th>
+                                <th>申請日期</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for leave in leaves %}
+                            <tr>
+                                <td>{{ leave.get_leave_type_display }}</td>
+                                <td>{{ leave.start_date|date:"Y-m-d" }}</td>
+                                <td>{{ leave.end_date|date:"Y-m-d" }}</td>
+                                <td>{{ leave.reason|default:"無" }}</td>
+                                <td>{{ leave.get_status_display }}</td>
+                                <td>{{ leave.applied_date|date:"Y-m-d" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="no-data">
+                        <div class="no-data-message">
+                            <h3>目前沒有請假紀錄</h3>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+
+            
+
+            
         </div>
     </div>
 </div>
@@ -696,19 +751,82 @@
         gap: 5px;
     }
 }
+/* 員工詳細資訊網格 */
+.employee-details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 15px;
+    padding: 15px;
+    background-color: #fdfdfd;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.detail-item {
+    padding: 10px 0;
+    border-bottom: 1px dashed #e9ecef;
+    font-size: 15px;
+    color: #495057;
+}
+
+.detail-item:last-child {
+    border-bottom: none;
+}
+
+.detail-item strong {
+    color: #343a40;
+    margin-right: 5px;
+}
+
+/* 覆蓋一些通用樣式 */
+.filter-section h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #007bff;
+    font-size: 20px;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 10px;
+}
+
+.salary-list h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #007bff;
+    font-size: 20px;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 10px;
+}
+
+.no-data-message h3 {
+    color: #6c757d;
+    margin-bottom: 15px;
+    font-size: 24px;
+}
+
+.no-data-message p {
+    margin-bottom: 25px;
+    font-size: 16px;
+}
+
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // 設定預設日期為今天
     const today = new Date().toISOString().split('T')[0];
-    document.getElementById('punchDate').value = today;
+    const punchDateElement = document.getElementById('punchDate');
+    if (punchDateElement) {
+        punchDateElement.value = today;
+    }
     // 設定預設時間為當前時間
     const now = new Date();
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
     const seconds = String(now.getSeconds()).padStart(2, '0');
-    document.getElementById('punchTime').value = `${hours}:${minutes}:${seconds}`;
+    const punchTimeElement = document.getElementById('punchTime');
+    if (punchTimeElement) {
+        punchTimeElement.value = `${hours}:${minutes}:${seconds}`;
+    }
 
     const addPunchRecordForm = document.getElementById('addPunchRecordForm');
     if (addPunchRecordForm) {
@@ -716,9 +834,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // 初始化側邊欄選中狀態
-    const currentEmployeeId = document.getElementById('employeeId').value;
-    if (currentEmployeeId) {
-        updateSidebarSelection(parseInt(currentEmployeeId));
+    const employeeIdElement = document.getElementById('employeeId');
+    if (employeeIdElement) {
+        const currentEmployeeId = employeeIdElement.value;
+        if (currentEmployeeId) {
+            updateSidebarSelection(parseInt(currentEmployeeId));
+        }
     }
 });
 
