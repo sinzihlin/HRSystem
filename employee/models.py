@@ -125,7 +125,7 @@ class SalaryDetail(models.Model):
         verbose_name='薪資紀錄'
     )
     item = models.ForeignKey(
-        SalaryItem,
+        'SalaryItem',
         on_delete=models.PROTECT,
         verbose_name='薪資項目'
     )

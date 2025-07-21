@@ -211,7 +211,25 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="7">沒有員工資料。</td>
+                <td colspan="7" style="text-align: center; padding: 40px; color: #6c757d;">
+                    {% if database_error %}
+                        <div style="color: #dc3545;">
+                            <strong>⚠️ {{ error_message }}</strong>
+                        </div>
+                    {% elif has_employees == False %}
+                        <div>
+                            <h3 style="color: #6c757d; margin-bottom: 15px;">📋 還沒有員工資料</h3>
+                            <p style="margin-bottom: 20px;">{{ no_data_message|default:"系統中還沒有員工資料，您可以開始新增員工。" }}</p>
+                            <button id="openImportModal" style="background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">
+                                🔄 匯入員工資料
+                            </button>
+                        </div>
+                    {% else %}
+                        <div style="color: #dc3545;">
+                            <strong>載入員工資料時發生錯誤，請重新整理頁面。</strong>
+                        </div>
+                    {% endif %}
+                </td>
             </tr>
             {% endfor %}
         </tbody>

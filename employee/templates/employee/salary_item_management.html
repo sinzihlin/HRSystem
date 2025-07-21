@@ -1,0 +1,734 @@
+{% extends "employee/base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1>薪資項目管理</h1>
+        <div class="header-actions">
+            <button id="createItemBtn" class="btn btn-primary">新增薪資項目</button>
+            <a href="{% url 'payroll_management' %}" class="btn btn-secondary">薪資期間管理</a>
+        </div>
+    </div>
+
+    <!-- 薪資項目列表 -->
+    <div class="items-section">
+        {% if salary_items %}
+            <!-- 加給項目 -->
+            <div class="item-category">
+                <h2>加給項目</h2>
+                <div class="items-grid">
+                    {% for item in salary_items %}
+                        {% if item.item_type == 'ALLOWANCE' %}
+                        <div class="item-card allowance">
+                            <div class="item-header">
+                                <h3>{{ item.name }}</h3>
+                                <div class="item-type-badge">加給</div>
+                            </div>
+                            <div class="item-details">
+                                <div class="detail-row">
+                                    <label>計算方式：</label>
+                                    <span>
+                                        {% if item.is_fixed %}
+                                            {% if item.amount %}
+                                                固定金額 NT$ {{ item.amount|floatformat:0 }}
+                                            {% else %}
+                                                未設定
+                                            {% endif %}
+                                        {% else %}
+                                            {% if item.percentage %}
+                                                按比例 {{ item.percentage }}%
+                                            {% else %}
+                                                未設定
+                                            {% endif %}
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                <div class="detail-row">
+                                    <label>適用對象：</label>
+                                    <span>
+                                        {% if item.apply_to_parttime %}
+                                            正職 + 兼職
+                                        {% else %}
+                                            僅正職
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                {% if item.description %}
+                                <div class="detail-row">
+                                    <label>說明：</label>
+                                    <span>{{ item.description }}</span>
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="item-actions">
+                                <button class="btn btn-sm btn-warning edit-btn" data-item-id="{{ item.id }}">編輯</button>
+                                <button class="btn btn-sm btn-danger delete-btn" data-item-id="{{ item.id }}" data-item-name="{{ item.name }}">刪除</button>
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- 獎金項目 -->
+            <div class="item-category">
+                <h2>獎金項目</h2>
+                <div class="items-grid">
+                    {% for item in salary_items %}
+                        {% if item.item_type == 'BONUS' %}
+                        <div class="item-card bonus">
+                            <div class="item-header">
+                                <h3>{{ item.name }}</h3>
+                                <div class="item-type-badge">獎金</div>
+                            </div>
+                            <div class="item-details">
+                                <div class="detail-row">
+                                    <label>計算方式：</label>
+                                    <span>
+                                        {% if item.is_fixed %}
+                                            {% if item.amount %}
+                                                固定金額 NT$ {{ item.amount|floatformat:0 }}
+                                            {% else %}
+                                                未設定
+                                            {% endif %}
+                                        {% else %}
+                                            {% if item.percentage %}
+                                                按比例 {{ item.percentage }}%
+                                            {% else %}
+                                                未設定
+                                            {% endif %}
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                <div class="detail-row">
+                                    <label>適用對象：</label>
+                                    <span>
+                                        {% if item.apply_to_parttime %}
+                                            正職 + 兼職
+                                        {% else %}
+                                            僅正職
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                {% if item.description %}
+                                <div class="detail-row">
+                                    <label>說明：</label>
+                                    <span>{{ item.description }}</span>
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="item-actions">
+                                <button class="btn btn-sm btn-warning edit-btn" data-item-id="{{ item.id }}">編輯</button>
+                                <button class="btn btn-sm btn-danger delete-btn" data-item-id="{{ item.id }}" data-item-name="{{ item.name }}">刪除</button>
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- 扣除項目 -->
+            <div class="item-category">
+                <h2>扣除項目</h2>
+                <div class="items-grid">
+                    {% for item in salary_items %}
+                        {% if item.item_type == 'DEDUCTION' %}
+                        <div class="item-card deduction">
+                            <div class="item-header">
+                                <h3>{{ item.name }}</h3>
+                                <div class="item-type-badge">扣除</div>
+                            </div>
+                            <div class="item-details">
+                                <div class="detail-row">
+                                    <label>計算方式：</label>
+                                    <span>
+                                        {% if item.is_fixed %}
+                                            {% if item.amount %}
+                                                固定金額 NT$ {{ item.amount|floatformat:0 }}
+                                            {% else %}
+                                                未設定
+                                            {% endif %}
+                                        {% else %}
+                                            {% if item.percentage %}
+                                                按比例 {{ item.percentage }}%
+                                            {% else %}
+                                                未設定
+                                            {% endif %}
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                <div class="detail-row">
+                                    <label>適用對象：</label>
+                                    <span>
+                                        {% if item.apply_to_parttime %}
+                                            正職 + 兼職
+                                        {% else %}
+                                            僅正職
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                {% if item.description %}
+                                <div class="detail-row">
+                                    <label>說明：</label>
+                                    <span>{{ item.description }}</span>
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="item-actions">
+                                <button class="btn btn-sm btn-warning edit-btn" data-item-id="{{ item.id }}">編輯</button>
+                                <button class="btn btn-sm btn-danger delete-btn" data-item-id="{{ item.id }}" data-item-name="{{ item.name }}">刪除</button>
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        {% else %}
+            <div class="no-items">
+                <div class="no-data-message">
+                    <h3>尚未設定薪資項目</h3>
+                    <p>請新增薪資項目以開始使用薪資計算功能</p>
+                    <button id="createFirstItemBtn" class="btn btn-primary">新增第一個薪資項目</button>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 新增/編輯薪資項目模態框 -->
+<div id="itemModal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2 id="modalTitle">新增薪資項目</h2>
+        <form id="itemForm">
+            <div class="form-group">
+                <label for="itemName">項目名稱：</label>
+                <input type="text" id="itemName" name="name" required class="form-control" placeholder="例：交通津貼">
+            </div>
+            
+            <div class="form-group">
+                <label for="itemType">項目類型：</label>
+                <select id="itemType" name="item_type" required class="form-control">
+                    <option value="">請選擇類型</option>
+                    <option value="ALLOWANCE">加給</option>
+                    <option value="BONUS">獎金</option>
+                    <option value="DEDUCTION">扣除</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>計算方式：</label>
+                <div class="calculation-type">
+                    <div class="radio-group">
+                        <input type="radio" id="fixedAmount" name="calculation_type" value="fixed" checked>
+                        <label for="fixedAmount">固定金額</label>
+                    </div>
+                    <div class="radio-group">
+                        <input type="radio" id="percentage" name="calculation_type" value="percentage">
+                        <label for="percentage">按比例計算</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group" id="amountGroup">
+                <label for="amount">固定金額：</label>
+                <input type="number" id="amount" name="amount" class="form-control" placeholder="0" min="0" step="1">
+                <small class="form-text">輸入固定的金額數值</small>
+            </div>
+            
+            <div class="form-group" id="percentageGroup" style="display: none;">
+                <label for="percentageValue">百分比：</label>
+                <input type="number" id="percentageValue" name="percentage" class="form-control" placeholder="0" min="0" max="100" step="0.01">
+                <small class="form-text">輸入百分比數值 (例：5.5 代表 5.5%)</small>
+            </div>
+            
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="applyToParttime" name="apply_to_parttime">
+                    <label for="applyToParttime">適用於兼職員工</label>
+                </div>
+                <small class="form-text">勾選此項目是否也適用於兼職員工</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="description">說明：</label>
+                <textarea id="description" name="description" class="form-control" rows="3" placeholder="項目說明（選填）"></textarea>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">保存</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('itemModal')">取消</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #007bff;
+}
+
+.header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.items-section {
+    margin-bottom: 40px;
+}
+
+.item-category {
+    margin-bottom: 40px;
+}
+
+.item-category h2 {
+    color: #495057;
+    margin-bottom: 20px;
+    padding: 15px 0;
+    border-bottom: 2px solid #dee2e6;
+    position: relative;
+}
+
+.item-category h2::before {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 60px;
+    height: 2px;
+    background-color: #007bff;
+}
+
+.items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+}
+
+.item-card {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    border-left: 4px solid #007bff;
+}
+
+.item-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    transform: translateY(-2px);
+}
+
+.item-card.allowance {
+    border-left-color: #28a745;
+}
+
+.item-card.bonus {
+    border-left-color: #17a2b8;
+}
+
+.item-card.deduction {
+    border-left-color: #dc3545;
+}
+
+.item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.item-header h3 {
+    margin: 0;
+    color: #495057;
+    font-size: 1.2em;
+}
+
+.item-type-badge {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.allowance .item-type-badge {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.bonus .item-type-badge {
+    background-color: #d1ecf1;
+    color: #0c5460;
+}
+
+.deduction .item-type-badge {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.item-details {
+    margin-bottom: 20px;
+}
+
+.detail-row {
+    display: flex;
+    margin-bottom: 8px;
+    align-items: flex-start;
+}
+
+.detail-row label {
+    font-weight: bold;
+    color: #6c757d;
+    min-width: 80px;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.detail-row span {
+    color: #495057;
+    flex: 1;
+    word-break: break-word;
+}
+
+.item-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.no-items {
+    text-align: center;
+    padding: 80px 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.no-data-message h3 {
+    color: #6c757d;
+    margin-bottom: 15px;
+}
+
+.no-data-message p {
+    color: #6c757d;
+    margin-bottom: 30px;
+}
+
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    color: white;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-warning {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    color: white;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 14px;
+}
+
+.btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 30px;
+    border: 1px solid #888;
+    width: 90%;
+    max-width: 600px;
+    border-radius: 8px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close:hover {
+    color: black;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #495057;
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 16px;
+    box-sizing: border-box;
+}
+
+.form-control:focus {
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+.form-text {
+    color: #6c757d;
+    font-size: 14px;
+    margin-top: 5px;
+    display: block;
+}
+
+.calculation-type {
+    display: flex;
+    gap: 20px;
+}
+
+.radio-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.radio-group input[type="radio"] {
+    margin: 0;
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.checkbox-group input[type="checkbox"] {
+    margin: 0;
+}
+
+.form-actions {
+    margin-top: 30px;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+@media (max-width: 768px) {
+    .page-header {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+    
+    .items-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .item-actions {
+        flex-direction: column;
+    }
+    
+    .calculation-type {
+        flex-direction: column;
+        gap: 10px;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 模態框控制
+    const createItemBtn = document.getElementById('createItemBtn');
+    const createFirstItemBtn = document.getElementById('createFirstItemBtn');
+    const itemModal = document.getElementById('itemModal');
+    const itemForm = document.getElementById('itemForm');
+    const modalTitle = document.getElementById('modalTitle');
+    
+    let isEditMode = false;
+    let editItemId = null;
+    
+    // 開啟新增模態框
+    function openCreateModal() {
+        isEditMode = false;
+        editItemId = null;
+        modalTitle.textContent = '新增薪資項目';
+        resetForm();
+        itemModal.style.display = 'block';
+    }
+    
+    if (createItemBtn) {
+        createItemBtn.onclick = openCreateModal;
+    }
+    
+    if (createFirstItemBtn) {
+        createFirstItemBtn.onclick = openCreateModal;
+    }
+    
+    // 關閉模態框
+    document.querySelectorAll('.close').forEach(closeBtn => {
+        closeBtn.onclick = function() {
+            this.closest('.modal').style.display = 'none';
+        };
+    });
+    
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = 'none';
+        }
+    };
+    
+    // 計算方式切換
+    const calculationTypeRadios = document.querySelectorAll('input[name="calculation_type"]');
+    const amountGroup = document.getElementById('amountGroup');
+    const percentageGroup = document.getElementById('percentageGroup');
+    
+    calculationTypeRadios.forEach(radio => {
+        radio.onchange = function() {
+            if (this.value === 'fixed') {
+                amountGroup.style.display = 'block';
+                percentageGroup.style.display = 'none';
+                document.getElementById('amount').required = true;
+                document.getElementById('percentageValue').required = false;
+            } else {
+                amountGroup.style.display = 'none';
+                percentageGroup.style.display = 'block';
+                document.getElementById('amount').required = false;
+                document.getElementById('percentageValue').required = true;
+            }
+        };
+    });
+    
+    // 表單提交
+    itemForm.onsubmit = function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(itemForm);
+        const calculationType = formData.get('calculation_type');
+        
+        const data = {
+            name: formData.get('name'),
+            item_type: formData.get('item_type'),
+            is_fixed: calculationType === 'fixed',
+            apply_to_parttime: formData.has('apply_to_parttime'),
+            description: formData.get('description')
+        };
+        
+        if (calculationType === 'fixed') {
+            data.amount = parseFloat(formData.get('amount')) || null;
+            data.percentage = null;
+        } else {
+            data.amount = null;
+            data.percentage = parseFloat(formData.get('percentage')) || null;
+        }
+        
+        const url = isEditMode ? `/api/salary-items/update/${editItemId}/` : '{% url "create_salary_item" %}';
+        
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('錯誤：' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('發生錯誤，請稍後再試');
+        });
+    };
+    
+    // 編輯按鈕
+    document.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.onclick = function() {
+            const itemId = this.getAttribute('data-item-id');
+            // 這裡可以載入項目資料進行編輯
+            alert('編輯功能將在後續版本實現');
+        };
+    });
+    
+    // 刪除按鈕
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.onclick = function() {
+            const itemId = this.getAttribute('data-item-id');
+            const itemName = this.getAttribute('data-item-name');
+            
+            if (confirm(`確定要刪除薪資項目「${itemName}」嗎？\n\n注意：刪除後相關的薪資計算將受到影響。`)) {
+                // 這裡可以實現刪除邏輯
+                alert('刪除功能將在後續版本實現');
+            }
+        };
+    });
+    
+    function resetForm() {
+        itemForm.reset();
+        document.getElementById('fixedAmount').checked = true;
+        amountGroup.style.display = 'block';
+        percentageGroup.style.display = 'none';
+        document.getElementById('amount').required = true;
+        document.getElementById('percentageValue').required = false;
+    }
+});
+
+// 全域函數
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+</script>
+{% endblock %}

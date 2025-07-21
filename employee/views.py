@@ -10,11 +10,24 @@ from django.views.generic import ListView, View, DetailView
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST, require_GET
 from django.utils import timezone
+from django.db import connection
+from django.core.exceptions import ImproperlyConfigured
+from django.db.utils import DatabaseError, OperationalError
 
 from .models import Department, Employee, Salary, Punch, Leave
 
 # 設定日誌
 logger = logging.getLogger(__name__)
+
+def check_database_connection():
+    """檢查資料庫連線是否正常"""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+        return True
+    except (DatabaseError, OperationalError) as e:
+        logger.error(f"資料庫連線失敗: {e}")
+        return False
 
 class CustomLoginView(LoginView):
     template_name = 'employee/login.html'
@@ -32,8 +45,40 @@ class EmployeeListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     def test_func(self):
         return self.request.user.is_staff
 
+    def dispatch(self, request, *args, **kwargs):
+        # 檢查資料庫連線
+        if not check_database_connection():
+            logger.error("資料庫連線失敗，轉向錯誤頁面")
+            return render(request, 'employee/database_error.html', {
+                'error_message': '資料庫暫時無法連線，請稍後再試或聯絡系統管理員。'
+            })
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        try:
+            return Employee.objects.all()
+        except (DatabaseError, OperationalError) as e:
+            logger.error(f"查詢員工資料時發生錯誤: {e}")
+            return Employee.objects.none()
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        
+        try:
+            # 檢查是否有員工資料
+            employee_count = Employee.objects.count()
+            context['employee_count'] = employee_count
+            context['has_employees'] = employee_count > 0
+            
+            # 如果沒有員工資料，提供友善的提示
+            if employee_count == 0:
+                context['no_data_message'] = '系統中還沒有員工資料，您可以使用「匯入員工資料」功能來新增員工。'
+            
+        except (DatabaseError, OperationalError) as e:
+            logger.error(f"取得員工統計資料時發生錯誤: {e}")
+            context['database_error'] = True
+            context['error_message'] = '載入資料時發生錯誤，請重新整理頁面或聯絡系統管理員。'
+        
         return context
 
 class EmployeeDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
@@ -58,6 +103,13 @@ def import_employees_api(request):
     if not request.user.is_authenticated or not request.user.is_staff:
         return JsonResponse({'status': 'error', 'message': '未授權。'}, status=403)
 
+    # 檢查資料庫連線
+    if not check_database_connection():
+        return JsonResponse({
+            'status': 'error', 
+            'message': '資料庫暫時無法連線，請稍後再試。'
+        }, status=503)
+
     csv_file = request.FILES.get('csv_file')
     if not csv_file:
         return JsonResponse({'status': 'error', 'message': '請選擇一個 CSV 檔案。'})
@@ -65,47 +117,64 @@ def import_employees_api(request):
     if not csv_file.name.endswith('.csv'):
         return JsonResponse({'status': 'error', 'message': '請上傳有效的 CSV 檔案。'})
 
-    decoded_file = csv_file.read().decode('utf-8').splitlines()
-    reader = csv.DictReader(decoded_file)
+    try:
+        decoded_file = csv_file.read().decode('utf-8').splitlines()
+        reader = csv.DictReader(decoded_file)
 
-    imported_count = 0
-    updated_count = 0
-    errors = []
+        imported_count = 0
+        updated_count = 0
+        errors = []
 
-    for i, row in enumerate(reader):
-        try:
-            department_name = row['department_name']
-            department, created_dept = Department.objects.get_or_create(name=department_name)
+        for i, row in enumerate(reader):
+            try:
+                department_name = row['department_name']
+                department, created_dept = Department.objects.get_or_create(name=department_name)
 
-            hire_date_str = row['hire_date']
-            hire_date = datetime.strptime(hire_date_str, '%Y-%m-%d').date()
+                hire_date_str = row['hire_date']
+                hire_date = datetime.strptime(hire_date_str, '%Y-%m-%d').date()
 
-            employee, created_emp = Employee.objects.update_or_create(
-                email=row['email'],
-                defaults={
-                    'name': row['name'],
-                    'phone': row['phone'],
-                    'department': department,
-                    'hire_date': hire_date,
-                }
-            )
+                employee, created_emp = Employee.objects.update_or_create(
+                    email=row['email'],
+                    defaults={
+                        'name': row['name'],
+                        'phone': row['phone'],
+                        'department': department,
+                        'hire_date': hire_date,
+                    }
+                )
 
-            if created_emp:
-                imported_count += 1
-            else:
-                updated_count += 1
+                if created_emp:
+                    imported_count += 1
+                else:
+                    updated_count += 1
 
-        except KeyError as e:
-            errors.append(f'第 {i+2} 行錯誤: 缺少欄位 {e}')
-        except ValueError as e:
-            errors.append(f'第 {i+2} 行錯誤: 日期格式不正確或資料無效 - {e}')
-        except Exception as e:
-            errors.append(f'第 {i+2} 行錯誤: {e}')
+            except KeyError as e:
+                errors.append(f'第 {i+2} 行錯誤: 缺少欄位 {e}')
+            except ValueError as e:
+                errors.append(f'第 {i+2} 行錯誤: 日期格式不正確或資料無效 - {e}')
+            except (DatabaseError, OperationalError) as e:
+                logger.error(f'資料庫操作錯誤: {e}')
+                errors.append(f'第 {i+2} 行錯誤: 資料庫操作失敗')
+            except Exception as e:
+                errors.append(f'第 {i+2} 行錯誤: {e}')
 
-    if errors:
-        return JsonResponse({'status': 'error', 'message': '匯入完成，但存在錯誤。', 'errors': errors})
-    else:
-        return JsonResponse({'status': 'success', 'message': f'成功匯入 {imported_count} 筆新員工資料，更新 {updated_count} 筆員工資料。'})
+        if errors:
+            return JsonResponse({'status': 'error', 'message': '匯入完成，但存在錯誤。', 'errors': errors})
+        else:
+            return JsonResponse({'status': 'success', 'message': f'成功匯入 {imported_count} 筆新員工資料，更新 {updated_count} 筆員工資料。'})
+    
+    except (DatabaseError, OperationalError) as e:
+        logger.error(f'匯入員工資料時發生資料庫錯誤: {e}')
+        return JsonResponse({
+            'status': 'error', 
+            'message': '資料庫操作失敗，請檢查資料庫連線或聯絡系統管理員。'
+        }, status=503)
+    except Exception as e:
+        logger.error(f'匯入員工資料時發生未預期錯誤: {e}')
+        return JsonResponse({
+            'status': 'error', 
+            'message': f'匯入失敗: {str(e)}'
+        }, status=500)
 
 @require_POST
 def punch_api(request):
@@ -235,3 +304,41 @@ def update_leave_status_api(request):
         return JsonResponse({'status': 'error', 'message': '無效的 JSON 格式。'})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': f'更新請假狀態失敗: {e}'})
+
+@require_GET
+def health_check(request):
+    """系統健康檢查端點"""
+    try:
+        # 檢查資料庫連線
+        db_status = check_database_connection()
+        
+        # 檢查基本資料表是否存在
+        tables_exist = True
+        try:
+            Employee.objects.count()
+            Department.objects.count()
+        except (DatabaseError, OperationalError):
+            tables_exist = False
+        
+        status = 'healthy' if db_status and tables_exist else 'unhealthy'
+        
+        response_data = {
+            'status': status,
+            'database_connection': db_status,
+            'tables_exist': tables_exist,
+            'timestamp': timezone.now().isoformat()
+        }
+        
+        if status == 'healthy':
+            response_data['employee_count'] = Employee.objects.count()
+            response_data['department_count'] = Department.objects.count()
+        
+        return JsonResponse(response_data)
+    
+    except Exception as e:
+        logger.error(f'健康檢查時發生錯誤: {e}')
+        return JsonResponse({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': timezone.now().isoformat()
+        }, status=500)

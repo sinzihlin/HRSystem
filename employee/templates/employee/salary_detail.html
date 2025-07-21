@@ -1,0 +1,478 @@
+{% extends "employee/base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1>薪資明細</h1>
+        <div class="header-actions">
+            <a href="{% url 'salary_list' %}" class="btn btn-secondary">返回薪資列表</a>
+            <button id="printBtn" class="btn btn-info">列印薪資單</button>
+        </div>
+    </div>
+
+    <div class="salary-detail-container">
+        <!-- 員工基本資訊 -->
+        <div class="employee-summary">
+            <div class="employee-card">
+                <h2>{{ salary.employee.name }}</h2>
+                <div class="employee-info">
+                    <div class="info-item">
+                        <label>部門：</label>
+                        <span>{{ salary.employee.department.name }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>僱用類型：</label>
+                        <span>{{ salary.employee.get_employment_type_display }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>到職日期：</label>
+                        <span>{{ salary.employee.hire_date|date:"Y-m-d" }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 薪資期間資訊 -->
+        <div class="period-summary">
+            <div class="period-card">
+                <h3>薪資期間</h3>
+                <div class="period-info">
+                    <div class="info-item">
+                        <label>計薪期間：</label>
+                        <span>{{ salary.period.start_date|date:"Y年m月d日" }} ~ {{ salary.period.end_date|date:"Y年m月d日" }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>發薪日期：</label>
+                        <span>{{ salary.period.pay_date|date:"Y年m月d日" }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>狀態：</label>
+                        <span class="status-badge {% if salary.is_confirmed %}confirmed{% else %}pending{% endif %}">
+                            {% if salary.is_confirmed %}已確認{% else %}待確認{% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 薪資明細表 -->
+        <div class="salary-breakdown">
+            <h3>薪資明細</h3>
+            
+            <!-- 基本薪資區塊 -->
+            <div class="salary-section">
+                <h4>基本薪資</h4>
+                <table class="detail-table">
+                    <thead>
+                        <tr>
+                            <th>項目</th>
+                            <th>說明</th>
+                            <th class="text-right">金額</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>{% if salary.employee.employment_type == 'FT' %}月薪{% else %}時薪總額{% endif %}</td>
+                            <td>
+                                {% if salary.employee.employment_type == 'FT' %}
+                                    基本月薪
+                                {% else %}
+                                    工作時數：{{ salary.working_hours|floatformat:1 }} 小時
+                                {% endif %}
+                            </td>
+                            <td class="text-right">NT$ {{ salary.base_amount|floatformat:0 }}</td>
+                        </tr>
+                        {% if salary.overtime_hours > 0 %}
+                        <tr>
+                            <td>加班費</td>
+                            <td>加班時數：{{ salary.overtime_hours|floatformat:1 }} 小時</td>
+                            <td class="text-right">NT$ {{ salary.overtime_amount|floatformat:0 }}</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 加給與獎金區塊 -->
+            {% with allowances=salary_details|default_if_none:"" %}
+            {% if allowances %}
+                <div class="salary-section">
+                    <h4>加給與獎金</h4>
+                    <table class="detail-table">
+                        <thead>
+                            <tr>
+                                <th>項目</th>
+                                <th>說明</th>
+                                <th class="text-right">金額</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for detail in salary_details %}
+                                {% if detail.item.item_type == 'ALLOWANCE' or detail.item.item_type == 'BONUS' %}
+                                <tr>
+                                    <td>{{ detail.item.name }}</td>
+                                    <td>{{ detail.description|default:detail.item.description }}</td>
+                                    <td class="text-right amount-positive">+NT$ {{ detail.amount|floatformat:0 }}</td>
+                                </tr>
+                                {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+            {% endwith %}
+
+            <!-- 扣除項目區塊 -->
+            {% with deductions=salary_details|default_if_none:"" %}
+            {% if deductions %}
+                <div class="salary-section">
+                    <h4>扣除項目</h4>
+                    <table class="detail-table">
+                        <thead>
+                            <tr>
+                                <th>項目</th>
+                                <th>說明</th>
+                                <th class="text-right">金額</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for detail in salary_details %}
+                                {% if detail.item.item_type == 'DEDUCTION' %}
+                                <tr>
+                                    <td>{{ detail.item.name }}</td>
+                                    <td>{{ detail.description|default:detail.item.description }}</td>
+                                    <td class="text-right amount-negative">-NT$ {{ detail.amount|floatformat:0 }}</td>
+                                </tr>
+                                {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+            {% endwith %}
+
+            <!-- 總計區塊 -->
+            <div class="salary-section total-section">
+                <table class="total-table">
+                    <tr class="total-row">
+                        <td class="total-label"><strong>實發薪資總額</strong></td>
+                        <td class="total-amount"><strong>NT$ {{ salary.total_salary|floatformat:0 }}</strong></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- 操作按鈕 -->
+        {% if not salary.is_confirmed %}
+        <div class="action-section">
+            <button id="confirmSalaryBtn" class="btn btn-success" data-salary-id="{{ salary.id }}">
+                確認此薪資記錄
+            </button>
+            <button id="recalculateBtn" class="btn btn-warning" data-salary-id="{{ salary.id }}">
+                重新計算薪資
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #007bff;
+}
+
+.header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.salary-detail-container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.employee-summary, .period-summary {
+    margin-bottom: 30px;
+}
+
+.employee-card, .period-card {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.employee-card h2 {
+    margin: 0 0 15px 0;
+    color: #007bff;
+}
+
+.period-card h3 {
+    margin: 0 0 15px 0;
+    color: #495057;
+}
+
+.employee-info, .period-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.info-item label {
+    font-weight: bold;
+    color: #6c757d;
+    margin-bottom: 5px;
+}
+
+.info-item span {
+    color: #495057;
+}
+
+.status-badge {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.status-badge.confirmed {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.status-badge.pending {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.salary-breakdown {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 30px;
+    margin-bottom: 30px;
+}
+
+.salary-breakdown h3 {
+    margin: 0 0 30px 0;
+    color: #007bff;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 10px;
+}
+
+.salary-section {
+    margin-bottom: 30px;
+}
+
+.salary-section h4 {
+    margin: 0 0 15px 0;
+    color: #495057;
+    padding: 10px 0;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+}
+
+.detail-table th,
+.detail-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.detail-table th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+    color: #495057;
+}
+
+.detail-table td {
+    color: #6c757d;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.amount-positive {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.amount-negative {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.total-section {
+    border-top: 3px solid #007bff;
+    padding-top: 20px;
+    margin-top: 30px;
+}
+
+.total-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.total-row {
+    background-color: #007bff;
+    color: white;
+}
+
+.total-label, .total-amount {
+    padding: 15px 20px;
+    font-size: 18px;
+}
+
+.total-amount {
+    text-align: right;
+}
+
+.action-section {
+    text-align: center;
+    padding: 30px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-top: 30px;
+}
+
+.action-section .btn {
+    margin: 0 10px;
+    padding: 12px 24px;
+    font-size: 16px;
+}
+
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-info {
+    background-color: #17a2b8;
+    color: white;
+}
+
+.btn-success {
+    background-color: #28a745;
+    color: white;
+}
+
+.btn-warning {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+    .page-header {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+    
+    .employee-info, .period-info {
+        grid-template-columns: 1fr;
+    }
+    
+    .detail-table {
+        font-size: 14px;
+    }
+    
+    .detail-table th,
+    .detail-table td {
+        padding: 8px;
+    }
+}
+
+@media print {
+    .page-header .header-actions,
+    .action-section {
+        display: none;
+    }
+    
+    .salary-detail-container {
+        max-width: none;
+    }
+    
+    .page-header {
+        border-bottom: 2px solid #000;
+    }
+    
+    .salary-breakdown {
+        border: 1px solid #000;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 列印功能
+    const printBtn = document.getElementById('printBtn');
+    if (printBtn) {
+        printBtn.onclick = function() {
+            window.print();
+        };
+    }
+
+    // 確認薪資記錄
+    const confirmBtn = document.getElementById('confirmSalaryBtn');
+    if (confirmBtn) {
+        confirmBtn.onclick = function() {
+            const salaryId = this.getAttribute('data-salary-id');
+            
+            if (confirm('確認此薪資記錄後將無法修改，確定要繼續嗎？')) {
+                // 這裡可以添加確認薪資的 API 呼叫
+                alert('確認功能將在後續版本實現');
+            }
+        };
+    }
+
+    // 重新計算薪資
+    const recalculateBtn = document.getElementById('recalculateBtn');
+    if (recalculateBtn) {
+        recalculateBtn.onclick = function() {
+            const salaryId = this.getAttribute('data-salary-id');
+            
+            if (confirm('重新計算會覆蓋現有的薪資資料，確定要繼續嗎？')) {
+                // 這裡可以添加重新計算的 API 呼叫
+                alert('重新計算功能將在後續版本實現');
+            }
+        };
+    }
+});
+</script>
+{% endblock %}

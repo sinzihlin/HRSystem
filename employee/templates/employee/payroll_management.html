@@ -1,0 +1,651 @@
+{% extends "employee/base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1>薪資期間管理</h1>
+        <div class="header-actions">
+            <button id="createPeriodBtn" class="btn btn-primary">創建新期間</button>
+            <a href="{% url 'salary_list' %}" class="btn btn-secondary">薪資列表</a>
+        </div>
+    </div>
+
+    <!-- 薪資期間列表 -->
+    <div class="periods-section">
+        <h2>薪資期間列表</h2>
+        
+        {% if periods %}
+            <div class="periods-grid">
+                {% for period in periods %}
+                <div class="period-card {% if period.is_processed %}processed{% else %}pending{% endif %}">
+                    <div class="period-header">
+                        <h3>{{ period.start_date|date:"Y年m月" }} 薪資</h3>
+                        <div class="period-status">
+                            {% if period.is_processed %}
+                                <span class="status-badge processed">已處理</span>
+                            {% else %}
+                                <span class="status-badge pending">待處理</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="period-details">
+                        <div class="detail-item">
+                            <label>計薪期間：</label>
+                            <span>{{ period.start_date|date:"Y-m-d" }} ~ {{ period.end_date|date:"Y-m-d" }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <label>發薪日期：</label>
+                            <span>{{ period.pay_date|date:"Y-m-d" }}</span>
+                        </div>
+                        {% if period.processed_date %}
+                        <div class="detail-item">
+                            <label>處理時間：</label>
+                            <span>{{ period.processed_date|date:"Y-m-d H:i" }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="period-actions">
+                        <a href="{% url 'salary_list' %}?period={{ period.id }}" class="btn btn-sm btn-info">
+                            查看薪資
+                        </a>
+                        
+                        {% if not period.is_processed %}
+                            <button class="btn btn-sm btn-primary process-btn" 
+                                    data-period-id="{{ period.id }}"
+                                    data-period-name="{{ period.start_date|date:"Y年m月" }}">
+                                處理薪資
+                            </button>
+                        {% else %}
+                            <button class="btn btn-sm btn-success" disabled>
+                                已完成
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="no-periods">
+                <div class="no-data-message">
+                    <h3>尚未建立薪資期間</h3>
+                    <p>請先建立薪資期間以開始薪資管理</p>
+                    <button id="createFirstPeriodBtn" class="btn btn-primary">建立第一個薪資期間</button>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- 快速統計 -->
+    <div class="statistics-section">
+        <h2>薪資統計</h2>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number" id="totalPeriods">{{ periods|length }}</div>
+                <div class="stat-label">總期間數</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="processedPeriods">
+                    {% for period in periods %}{% if period.is_processed %}{{ forloop.counter }}{% endif %}{% endfor %}
+                </div>
+                <div class="stat-label">已處理期間</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="pendingPeriods">
+                    {% for period in periods %}{% if not period.is_processed %}{{ forloop.counter }}{% endif %}{% endfor %}
+                </div>
+                <div class="stat-label">待處理期間</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 創建薪資期間模態框 -->
+<div id="createPeriodModal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>創建薪資期間</h2>
+        <form id="createPeriodForm">
+            <div class="form-group">
+                <label for="startDate">開始日期：</label>
+                <input type="date" id="startDate" name="start_date" required class="form-control">
+                <small class="form-text">建議選擇月初第一天</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="endDate">結束日期：</label>
+                <input type="date" id="endDate" name="end_date" required class="form-control">
+                <small class="form-text">建議選擇月底最後一天</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="payDate">發薪日：</label>
+                <input type="date" id="payDate" name="pay_date" required class="form-control">
+                <small class="form-text">發薪日應晚於結束日期</small>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">創建期間</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('createPeriodModal')">取消</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 處理薪資確認模態框 -->
+<div id="processPayrollModal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>處理薪資計算</h2>
+        <div id="processModalContent">
+            <p>確定要開始處理 <strong id="processPeriodName"></strong> 的薪資計算嗎？</p>
+            <p class="warning-text">⚠️ 薪資處理後將無法修改，請確認所有打卡記錄都已正確輸入。</p>
+            
+            <div class="process-options">
+                <div class="option-item">
+                    <input type="checkbox" id="includeOvertimeCalc" checked>
+                    <label for="includeOvertimeCalc">包含加班費計算</label>
+                </div>
+                <div class="option-item">
+                    <input type="checkbox" id="includeDeductions" checked>
+                    <label for="includeDeductions">包含扣除項目</label>
+                </div>
+            </div>
+            
+            <div class="form-actions">
+                <button id="confirmProcessBtn" class="btn btn-primary">開始處理</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('processPayrollModal')">取消</button>
+            </div>
+        </div>
+        
+        <div id="processProgressContent" style="display: none;">
+            <h3>處理中...</h3>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <p id="progressText">正在計算薪資...</p>
+        </div>
+    </div>
+</div>
+
+<style>
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #007bff;
+}
+
+.header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.periods-section, .statistics-section {
+    margin-bottom: 40px;
+}
+
+.periods-section h2, .statistics-section h2 {
+    color: #495057;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.periods-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.period-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: box-shadow 0.3s ease;
+}
+
+.period-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.period-card.processed {
+    border-left: 4px solid #28a745;
+}
+
+.period-card.pending {
+    border-left: 4px solid #ffc107;
+}
+
+.period-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.period-header h3 {
+    margin: 0;
+    color: #007bff;
+}
+
+.status-badge {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.status-badge.processed {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.status-badge.pending {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.period-details {
+    margin-bottom: 20px;
+}
+
+.detail-item {
+    display: flex;
+    margin-bottom: 8px;
+}
+
+.detail-item label {
+    font-weight: bold;
+    color: #6c757d;
+    min-width: 80px;
+    margin-right: 10px;
+}
+
+.detail-item span {
+    color: #495057;
+}
+
+.period-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.no-periods {
+    text-align: center;
+    padding: 60px 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.no-data-message h3 {
+    color: #6c757d;
+    margin-bottom: 10px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.stat-card {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+    padding: 30px 20px;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.stat-number {
+    font-size: 3em;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.stat-label {
+    font-size: 1.1em;
+    opacity: 0.9;
+}
+
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    color: white;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-info {
+    background-color: #17a2b8;
+    color: white;
+}
+
+.btn-success {
+    background-color: #28a745;
+    color: white;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 14px;
+}
+
+.btn:hover:not(:disabled) {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 10% auto;
+    padding: 30px;
+    border: 1px solid #888;
+    width: 90%;
+    max-width: 500px;
+    border-radius: 8px;
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close:hover {
+    color: black;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #495057;
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+.form-text {
+    color: #6c757d;
+    font-size: 14px;
+    margin-top: 5px;
+}
+
+.form-actions {
+    margin-top: 30px;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.warning-text {
+    color: #856404;
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 15px 0;
+}
+
+.process-options {
+    margin: 20px 0;
+}
+
+.option-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.option-item input[type="checkbox"] {
+    margin-right: 10px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 20px;
+    background-color: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 20px 0;
+}
+
+.progress-fill {
+    height: 100%;
+    background-color: #007bff;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+@media (max-width: 768px) {
+    .page-header {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+    
+    .periods-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .period-actions {
+        flex-direction: column;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 模態框控制
+    const createPeriodBtn = document.getElementById('createPeriodBtn');
+    const createFirstPeriodBtn = document.getElementById('createFirstPeriodBtn');
+    const createPeriodModal = document.getElementById('createPeriodModal');
+    const processPayrollModal = document.getElementById('processPayrollModal');
+    
+    // 開啟創建期間模態框
+    function openCreateModal() {
+        createPeriodModal.style.display = 'block';
+        
+        // 設定預設日期（本月1號到月底）
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth();
+        
+        const startDate = new Date(year, month, 1);
+        const endDate = new Date(year, month + 1, 0);
+        const payDate = new Date(year, month + 1, 5); // 下月5號發薪
+        
+        document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+        document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+        document.getElementById('payDate').value = payDate.toISOString().split('T')[0];
+    }
+    
+    if (createPeriodBtn) {
+        createPeriodBtn.onclick = openCreateModal;
+    }
+    
+    if (createFirstPeriodBtn) {
+        createFirstPeriodBtn.onclick = openCreateModal;
+    }
+    
+    // 關閉模態框
+    document.querySelectorAll('.close').forEach(closeBtn => {
+        closeBtn.onclick = function() {
+            this.closest('.modal').style.display = 'none';
+        };
+    });
+    
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = 'none';
+        }
+    };
+    
+    // 創建薪資期間表單提交
+    const createPeriodForm = document.getElementById('createPeriodForm');
+    createPeriodForm.onsubmit = function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(createPeriodForm);
+        const data = {
+            start_date: formData.get('start_date'),
+            end_date: formData.get('end_date'),
+            pay_date: formData.get('pay_date')
+        };
+        
+        fetch('{% url "create_payroll_period" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('錯誤：' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('發生錯誤，請稍後再試');
+        });
+    };
+    
+    // 處理薪資按鈕
+    document.querySelectorAll('.process-btn').forEach(btn => {
+        btn.onclick = function() {
+            const periodId = this.getAttribute('data-period-id');
+            const periodName = this.getAttribute('data-period-name');
+            
+            document.getElementById('processPeriodName').textContent = periodName;
+            document.getElementById('confirmProcessBtn').setAttribute('data-period-id', periodId);
+            
+            processPayrollModal.style.display = 'block';
+        };
+    });
+    
+    // 確認處理薪資
+    const confirmProcessBtn = document.getElementById('confirmProcessBtn');
+    if (confirmProcessBtn) {
+        confirmProcessBtn.onclick = function() {
+            const periodId = this.getAttribute('data-period-id');
+            
+            // 隱藏確認內容，顯示進度
+            document.getElementById('processModalContent').style.display = 'none';
+            document.getElementById('processProgressContent').style.display = 'block';
+            
+            // 模擬進度
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += 10;
+                document.getElementById('progressFill').style.width = progress + '%';
+                
+                if (progress >= 100) {
+                    clearInterval(progressInterval);
+                    // 實際 API 調用
+                    processPayroll(periodId);
+                }
+            }, 200);
+        };
+    }
+    
+    function processPayroll(periodId) {
+        fetch('{% url "process_payroll" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ period_id: periodId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('錯誤：' + data.message);
+                processPayrollModal.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('處理失敗，請稍後再試');
+            processPayrollModal.style.display = 'none';
+        });
+    }
+});
+
+// 全域函數
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+    
+    // 重設進度模態框
+    if (modalId === 'processPayrollModal') {
+        document.getElementById('processModalContent').style.display = 'block';
+        document.getElementById('processProgressContent').style.display = 'none';
+        document.getElementById('progressFill').style.width = '0%';
+    }
+}
+</script>
+{% endblock %}
