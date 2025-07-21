@@ -172,8 +172,8 @@ class SalaryDetail(models.Model):
 
 class Punch(models.Model):
     PUNCH_TYPES = [
-        ('IN', '上班打卡'),
-        ('OUT', '下班打卡'),
+        ('IN', '上班'),
+        ('OUT', '下班'),
     ]
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
     punch_time = models.DateTimeField()
