@@ -13,6 +13,7 @@ from django.utils import timezone
 from django.db import connection
 from django.core.exceptions import ImproperlyConfigured
 from django.db.utils import DatabaseError, OperationalError
+import openpyxl # 新增這一行
 
 from .models import Department, Employee, Salary, Punch, Leave
 
@@ -48,7 +49,6 @@ class CustomLogoutView(LogoutView):
     template_name = 'employee/logged_out.html'
 
 
-
 @require_POST
 def import_employees_api(request):
     if not request.user.is_authenticated or not request.user.is_staff:
@@ -61,33 +61,58 @@ def import_employees_api(request):
             'message': '資料庫暫時無法連線，請稍後再試。'
         }, status=503)
 
-    csv_file = request.FILES.get('csv_file')
-    if not csv_file:
-        return JsonResponse({'status': 'error', 'message': '請選擇一個 CSV 檔案。'})
+    uploaded_file = request.FILES.get('file') # 將 csv_file 改為 file 以支援多種檔案類型
+    if not uploaded_file:
+        return JsonResponse({'status': 'error', 'message': '請選擇一個檔案。'})
 
-    if not csv_file.name.endswith('.csv'):
-        return JsonResponse({'status': 'error', 'message': '請上傳有效的 CSV 檔案。'})
+    file_extension = uploaded_file.name.split('.')[-1].lower()
+    
+    if file_extension not in ['csv', 'xlsx']:
+        return JsonResponse({'status': 'error', 'message': '請上傳有效的 CSV 或 Excel 檔案 (.csv, .xlsx)。'})
+
+    imported_count = 0
+    updated_count = 0
+    errors = []
 
     try:
-        decoded_file = csv_file.read().decode('utf-8').splitlines()
-        reader = csv.DictReader(decoded_file)
+        if file_extension == 'csv':
+            decoded_file = uploaded_file.read().decode('utf-8').splitlines()
+            reader = csv.DictReader(decoded_file)
+            rows = list(reader)
+        elif file_extension == 'xlsx':
+            workbook = openpyxl.load_workbook(uploaded_file)
+            sheet = workbook.active
+            headers = [cell.value for cell in sheet[1]]
+            rows = []
+            for row_idx in range(2, sheet.max_row + 1):
+                row_data = {}
+                for col_idx, cell in enumerate(sheet[row_idx]):
+                    row_data[headers[col_idx]] = cell.value
+                rows.append(row_data)
 
-        imported_count = 0
-        updated_count = 0
-        errors = []
-
-        for i, row in enumerate(reader):
+        for i, row in enumerate(rows):
             try:
+                # 檢查必要的欄位是否存在
+                required_fields = ['employee_id', 'name', 'email', 'phone', 'department_name', 'hire_date']
+                for field in required_fields:
+                    if field not in row or row[field] is None:
+                        raise KeyError(f"缺少欄位: {field}")
+
                 department_name = row['department_name']
                 department, created_dept = Department.objects.get_or_create(name=department_name)
 
-                hire_date_str = row['hire_date']
-                hire_date = datetime.strptime(hire_date_str, '%Y-%m-%d').date()
+                hire_date_str = str(row['hire_date']) # 確保是字串，以防 Excel 讀取為 datetime 物件
+                # 處理 Excel 可能將日期讀取為 datetime 物件的情況
+                if isinstance(row['hire_date'], datetime):
+                    hire_date = row['hire_date'].date()
+                else:
+                    hire_date = datetime.strptime(hire_date_str, '%Y-%m-%d').date()
 
                 employee, created_emp = Employee.objects.update_or_create(
-                    email=row['email'],
+                    employee_id=row['employee_id'], # 使用 employee_id 作為唯一識別碼
                     defaults={
                         'name': row['name'],
+                        'email': row['email'],
                         'phone': row['phone'],
                         'department': department,
                         'hire_date': hire_date,
@@ -124,6 +149,94 @@ def import_employees_api(request):
         logger.error(f'匯入員工資料時發生未預期錯誤: {e}')
         return JsonResponse({
             'status': 'error', 
+            'message': f'匯入失敗: {str(e)}'
+        }, status=500)
+
+@require_POST
+def import_punches_excel_api(request):
+    if not request.user.is_authenticated or not request.user.is_staff:
+        return JsonResponse({'status': 'error', 'message': '未授權。'}, status=403)
+
+    if not check_database_connection():
+        return JsonResponse({
+            'status': 'error',
+            'message': '資料庫暫時無法連線，請稍後再試。'
+        }, status=503)
+
+    uploaded_file = request.FILES.get('file')
+    if not uploaded_file:
+        return JsonResponse({'status': 'error', 'message': '請選擇一個檔案。'}) 
+
+    file_extension = uploaded_file.name.split('.')[-1].lower()
+    if file_extension != 'xlsx':
+        return JsonResponse({'status': 'error', 'message': '請上傳有效的 Excel 檔案 (.xlsx)。'}) 
+
+    imported_count = 0
+    errors = []
+
+    try:
+        workbook = openpyxl.load_workbook(uploaded_file)
+        sheet = workbook.active
+        headers = [cell.value for cell in sheet[1]]
+
+        # Expected headers for punch data
+        expected_headers = ['employee_id', 'punch_type', 'punch_time'] # 將 employee_email 改為 employee_id
+        if not all(h in headers for h in expected_headers):
+            return JsonResponse({'status': 'error', 'message': f'Excel 檔案缺少必要的欄位。需要: {", ".join(expected_headers)}'}, status=400)
+
+        for row_idx in range(2, sheet.max_row + 1):
+            row_data = {}
+            for col_idx, cell in enumerate(sheet[row_idx]):
+                if col_idx < len(headers):
+                    row_data[headers[col_idx]] = cell.value
+
+            try:
+                employee_id = row_data.get('employee_id') # 從 employee_email 改為 employee_id
+                punch_type = row_data.get('punch_type')
+                punch_time_value = row_data.get('punch_time')
+
+                if not employee_id or not punch_type or not punch_time_value:
+                    raise ValueError("缺少必要的打卡資訊 (員工編號、打卡類型或打卡時間)。")
+
+                employee = Employee.objects.get(employee_id=employee_id) # 從 email 改為 employee_id
+
+                # Handle various date/time formats from Excel
+                if isinstance(punch_time_value, datetime):
+                    punch_time = timezone.make_aware(punch_time_value)
+                elif isinstance(punch_time_value, str):
+                    try:
+                        punch_time = timezone.make_aware(datetime.strptime(punch_time_value, '%Y-%m-%d %H:%M:%S'))
+                    except ValueError:
+                        punch_time = timezone.make_aware(datetime.strptime(punch_time_value, '%Y-%m-%d %H:%M'))
+                else:
+                    raise ValueError("無法解析打卡時間格式。")
+
+                Punch.objects.create(
+                    employee=employee,
+                    punch_time=punch_time,
+                    punch_type=punch_type
+                )
+                imported_count += 1
+
+            except Employee.DoesNotExist:
+                errors.append(f'第 {row_idx} 行錯誤: 員工編號 {employee_id} 不存在。') # 錯誤訊息調整
+            except ValueError as e:
+                errors.append(f'第 {row_idx} 行錯誤: 資料格式不正確或無效 - {e}')
+            except (DatabaseError, OperationalError) as e:
+                logger.error(f'資料庫操作錯誤: {e}')
+                errors.append(f'第 {row_idx} 行錯誤: 資料庫操作失敗')
+            except Exception as e:
+                errors.append(f'第 {row_idx} 行錯誤: {e}')
+
+        if errors:
+            return JsonResponse({'status': 'error', 'message': '匯入完成，但存在錯誤。', 'errors': errors})
+        else:
+            return JsonResponse({'status': 'success', 'message': f'成功匯入 {imported_count} 筆打卡記錄。'})
+
+    except Exception as e:
+        logger.error(f'匯入打卡記錄時發生未預期錯誤: {e}')
+        return JsonResponse({
+            'status': 'error',
             'message': f'匯入失敗: {str(e)}'
         }, status=500)
 
@@ -253,6 +366,8 @@ def update_leave_status_api(request):
         return JsonResponse({'status': 'error', 'message': '請假申請不存在。'})
     except json.JSONDecodeError:
         return JsonResponse({'status': 'error', 'message': '無效的 JSON 格式。'})
+    except ValueError as e:
+        return JsonResponse({'status': 'error', 'message': f'日期時間格式錯誤: {e}'})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': f'更新請假狀態失敗: {e}'})
 
@@ -303,3 +418,7 @@ def health_check(request):
             'error': str(e),
             'timestamp': timezone.now().isoformat()
         }, status=500)
+
+def settings_view(request):
+    """渲染設定頁面"""
+    return render(request, 'employee/settings.html')

@@ -16,11 +16,12 @@ class Employee(models.Model):
         ('PT', '兼職'),
     ]
     
+    employee_id = models.CharField(max_length=50, unique=True, verbose_name='員工編號', null=True, blank=True)
     name = models.CharField(max_length=100, verbose_name='姓名')
-    email = models.EmailField(verbose_name='電子郵件')
-    phone = models.CharField(max_length=20, verbose_name='電話')
-    department = models.ForeignKey(Department, on_delete=models.CASCADE, verbose_name='部門')
-    hire_date = models.DateField(verbose_name='到職日期')
+    email = models.EmailField(verbose_name='電子郵件', null=True, blank=True) # 修改為可選
+    phone = models.CharField(max_length=20, verbose_name='電話', null=True, blank=True) # 修改為可選
+    department = models.ForeignKey(Department, on_delete=models.CASCADE, verbose_name='部門', null=True, blank=True) # 修改為可選
+    hire_date = models.DateField(verbose_name='到職日期', null=True, blank=True) # 修改為可選
     employment_type = models.CharField(
         max_length=2,
         choices=EMPLOYMENT_TYPE_CHOICES,

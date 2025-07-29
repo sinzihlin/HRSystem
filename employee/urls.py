@@ -19,6 +19,7 @@ urlpatterns = [
     
     # 員工相關 API
     path('api/employees/import/', views.import_employees_api, name='import_employees_api'),
+    path('api/punches/import_excel/', views.import_punches_excel_api, name='import_punches_excel_api'),
     path('api/punch/', views.punch_api, name='punch_api'),
     path('api/leave/', views.leave_api, name='leave_api'),
     path('api/leaves/pending/', views.get_pending_leaves_api, name='get_pending_leaves_api'),
@@ -37,4 +38,5 @@ urlpatterns = [
     
     # 系統相關
     path('api/health/', views.health_check, name='health_check'),
+    path('settings/', views.settings_view, name='settings'),
 ]
